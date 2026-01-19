@@ -1,12 +1,12 @@
 <?php
 
+use App\Models\User;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use Laravel\Fortify\Features;
 
 Route::get('/', function () {
     return Inertia::render('welcome', [
-        'canRegister' => Features::enabled(Features::registration()),
+        'canRegister' => User::query()->doesntExist(),
     ]);
 })->name('home');
 
