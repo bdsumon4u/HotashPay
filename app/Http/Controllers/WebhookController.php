@@ -25,7 +25,7 @@ class WebhookController extends Controller
 
         $setting = $this->getWebhookSetting($webhook);
 
-        if (!$setting) {
+        if (! $setting) {
             return response()->json([
                 'status' => false,
                 'message' => 'Invalid Webhook',
@@ -66,7 +66,7 @@ class WebhookController extends Controller
 
     private function handleDeviceConnection(Request $request): void
     {
-        if (!$request->filled(['d_model', 'd_brand', 'd_version', 'd_api_level'])) {
+        if (! $request->filled(['d_model', 'd_brand', 'd_version', 'd_api_level'])) {
             return;
         }
 
@@ -127,7 +127,7 @@ class WebhookController extends Controller
 
             return response()->json([
                 'status' => true,
-                'message' => "SMS processed successfully",
+                'message' => 'SMS processed successfully',
             ]);
         }
 

@@ -2,8 +2,6 @@
 
 namespace App\Services;
 
-use App\Enums\PaymentProvider;
-
 class SmsParsingService
 {
     private const PROVIDER_FORMATS = [
@@ -80,7 +78,7 @@ class SmsParsingService
     {
         $provider = $this->matchProvider($from);
 
-        if (!$provider) {
+        if (! $provider) {
             return null;
         }
 
@@ -148,12 +146,14 @@ class SmsParsingService
         try {
             if (isset($matches['datetime'])) {
                 $dateString = str_replace('/', '-', $matches['datetime']);
+
                 return \Carbon\Carbon::createFromFormat('d-m-Y H:i', $dateString)->toDateTimeString();
             }
 
             if (isset($matches['date']) && isset($matches['time'])) {
                 $dateString = str_replace('/', '-', $matches['date']);
                 $fullDateTime = "{$dateString} {$matches['time']}";
+
                 return \Carbon\Carbon::createFromFormat('d-m-Y H:i', $fullDateTime)->toDateTimeString();
             }
         } catch (\Exception $e) {

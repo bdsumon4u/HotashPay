@@ -37,16 +37,19 @@
                         </div>
                         <div class="flex items-center w-full p-4 space-x-2">
                             @if (is_plugin_active($pluginFolder))
-                                <div class="flex justify-center items-center px-2 py-1.5 space-x-1.5 w-full text-sm text-center text-white bg-blue-500 rounded">
+                                <div
+                                    class="flex justify-center items-center px-2 py-1.5 space-x-1.5 w-full text-sm text-center text-white bg-blue-500 rounded">
                                     <x-heroicon-o-check class="w-4 h-4 text-white" />
                                     <span>Active</span>
                                 </div>
-                                <button wire:click="deactivate('{{ $pluginFolder }}')" class="flex justify-center items-center px-2 py-1.5 space-x-1.5 w-full text-sm text-red-500 hover:bg-red-500 rounded border border-neutral-200 dark:border-neutral-700 hover:text-white hover:border-red-600">
+                                <button wire:click="deactivate('{{ $pluginFolder }}')"
+                                    class="flex justify-center items-center px-2 py-1.5 space-x-1.5 w-full text-sm text-red-500 hover:bg-red-500 rounded border border-neutral-200 dark:border-neutral-700 hover:text-white hover:border-red-600">
                                     <x-heroicon-o-bolt class="w-4 h-4" />
                                     <span>Deactivate</span>
                                 </button>
                             @else
-                                <button wire:click="activate('{{ $pluginFolder }}')" class="flex justify-center items-center px-2 py-1.5 space-x-1.5 w-full text-sm text-blue-500 rounded border border-neutral-200 dark:border-neutral-700 hover:text-white hover:bg-blue-500 hover:border-blue-600">
+                                <button wire:click="activate('{{ $pluginFolder }}')"
+                                    class="flex justify-center items-center px-2 py-1.5 space-x-1.5 w-full text-sm text-blue-500 rounded border border-neutral-200 dark:border-neutral-700 hover:text-white hover:bg-blue-500 hover:border-blue-600">
                                     <x-heroicon-o-bolt class="w-4 h-4" />
                                     <span>Activate</span>
                                 </button>
