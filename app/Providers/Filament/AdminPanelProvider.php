@@ -3,9 +3,11 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Pages\Auth\LoginPage;
+use App\Filament\Pages\RegisterPage;
 use App\Models\User;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Auth\MultiFactor\Email\EmailAuthentication;
+use Filament\Auth\Pages\Register;
 use Filament\Facades\Filament;
 use Filament\FontProviders\GoogleFontProvider;
 use Filament\Http\Middleware\Authenticate;
@@ -35,7 +37,7 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->login(LoginPage::class)
-            ->registration(fn (): bool => User::query()->doesntExist())
+            ->registration(RegisterPage::class)
             ->passwordReset()
             ->emailVerification()
             ->profile(isSimple: false)

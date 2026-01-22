@@ -2,8 +2,6 @@
 
 namespace App\Plugins;
 
-use App\Plugins\Plugin;
-use App\Plugins\PluginLoader;
 use Exception;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Facades\Artisan;
@@ -147,6 +145,8 @@ class PluginManager
         foreach ($plugin->getPostDeactivationCommands() as $command) {
             is_string($command) ? Artisan::call($command) : $command();
         }
+
+        // Note: Plugin migrations are not rolled back automatically
     }
 
     private function runPluginMigrations(Plugin $plugin): void
@@ -159,7 +159,7 @@ class PluginManager
         }
 
         Artisan::call('migrate', [
-            '--path' => "resources/plugins/{$pluginFolder}/database/migrations",
+            '--path' => str_replace(base_path('/'), '', $migrationPath),
             '--force' => true,
         ]);
     }
