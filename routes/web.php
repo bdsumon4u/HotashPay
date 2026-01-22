@@ -1,6 +1,7 @@
 <?php
 
 use App\Filament\Pages\MakePayment;
+use App\Http\Controllers\PluginImageController;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -19,4 +20,5 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 require __DIR__.'/settings.php';
 
+Route::get('hotash/plugins/{plugin}/image', PluginImageController::class)->name('plugins.image');
 Route::get('payment/{invoice:ulid}', MakePayment::class)->name('invoices.pay');

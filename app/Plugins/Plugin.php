@@ -19,7 +19,7 @@ abstract class Plugin extends ServiceProvider
 
     public function getName(): string
     {
-        return basename($this->folder);
+        return str(basename($this->folder))->replace('-', ' ')->title();
     }
 
     public function getVersion(): string

@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Plugins\Facades\PluginManager;
+use App\Plugins\NagadPersonal\AmiParina;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -20,6 +21,7 @@ class Plugins extends Page
 
     public function mount(): void
     {
+        // new AmiParina();
         $this->refreshPlugins();
     }
 

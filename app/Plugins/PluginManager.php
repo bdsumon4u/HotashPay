@@ -164,7 +164,7 @@ class PluginManager
         ]);
     }
 
-    private function loadPluginInstance(string $folder): ?Plugin
+    public function loadPluginInstance(string $folder): ?Plugin
     {
         $pluginPath = PluginLoader::findPluginFile($folder);
 

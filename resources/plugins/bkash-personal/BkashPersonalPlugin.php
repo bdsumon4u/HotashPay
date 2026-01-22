@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Plugins\NagadPersonal;
+namespace App\Plugins\BkashPersonal;
 
 use App\Plugins\Plugin;
 
-class NagadPersonalPlugin extends Plugin
+class BkashPersonalPlugin extends Plugin
 {
     public function register(): void
     {
