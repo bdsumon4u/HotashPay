@@ -64,28 +64,28 @@ class PluginLoader
                 return;
             }
 
-            $relative_class = substr($class, $len);
-            $parts = explode('\\', $relative_class);
+            $relativeClass = substr($class, $len);
+            $parts = explode('\\', $relativeClass);
 
             if (count($parts) < 2) {
                 return;
             }
 
-            $plugin_name = $parts[0];
-            $kebab_name = Str::kebab($plugin_name);
-            $class_file = implode('/', array_slice($parts, 1)).'.php';
-            $base_dir = self::getPluginsPath();
+            $pluginName = $parts[0];
+            $kebabName = Str::kebab($pluginName);
+            $classFile = implode('/', array_slice($parts, 1)).'.php';
+            $baseDir = self::getPluginsPath();
 
-            $file = $base_dir.'/'.$kebab_name.'/'.$class_file;
+            $file = $baseDir.'/'.$kebabName.'/'.$classFile;
             if (File::exists($file)) {
                 require $file;
 
                 return;
             }
 
-            $src_file = $base_dir.'/'.$kebab_name.'/src/'.$class_file;
-            if (File::exists($src_file)) {
-                require $src_file;
+            $srcFile = $baseDir.'/'.$kebabName.'/src/'.$classFile;
+            if (File::exists($srcFile)) {
+                require $srcFile;
             }
         });
 
