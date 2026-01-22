@@ -33,6 +33,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            ->viteTheme('resources/css/filament/admin/theme.css')
             ->login(LoginPage::class)
             ->registration(fn (): bool => User::query()->doesntExist())
             ->passwordReset()
@@ -81,7 +82,7 @@ class AdminPanelProvider extends PanelProvider
                     ->recoverable(),
                 EmailAuthentication::make(),
             ], isRequired: false)
-            ->strictAuthorization()
+            // ->strictAuthorization()
             ->unsavedChangesAlerts()
             ->spa(hasPrefetching: true);
     }

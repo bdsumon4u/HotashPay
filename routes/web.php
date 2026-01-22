@@ -1,5 +1,6 @@
 <?php
 
+use App\Filament\Pages\MakePayment;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -17,3 +18,5 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 require __DIR__.'/settings.php';
+
+Route::get('payment/{invoice:ulid}', MakePayment::class)->name('invoices.pay');

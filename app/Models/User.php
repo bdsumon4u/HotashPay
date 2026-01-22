@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable implements HasAppAuthentication, HasAppAuthenticationRecovery, HasEmailAuthentication
 {
@@ -22,6 +23,7 @@ class User extends Authenticatable implements HasAppAuthentication, HasAppAuthen
 
     use InteractsWithAppAuthentication, InteractsWithAppAuthenticationRecovery;
     use InteractsWithEmailAuthentication;
+    use HasApiTokens;
 
     /**
      * The attributes that are mass assignable.
