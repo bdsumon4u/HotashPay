@@ -124,6 +124,7 @@ class PluginManager
 
         $this->plugins[$pluginName] = $plugin;
         $this->app->register($plugin);
+
         Log::info("Loaded plugin: {$plugin->getName()}");
     }
 

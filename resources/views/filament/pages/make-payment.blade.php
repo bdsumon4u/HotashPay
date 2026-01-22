@@ -1,9 +1,9 @@
 @push('styles')
-<style>
-    .fi-simple-main {
-        padding: 0;
-    }
-</style>
+    <style>
+        .fi-simple-main {
+            padding: 0;
+        }
+    </style>
 @endpush
 
 <div class="flex items-center justify-center" x-data="{
@@ -20,19 +20,16 @@
 }">
     <div class="w-full max-w-lg relative bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
         <!-- Toast Notification -->
-        <div 
-            x-show="showCopyToast"
-            x-transition
+        <div x-show="showCopyToast" x-transition
             class="absolute top-1 right-1 bg-green-500 text-white px-4 py-3 rounded-lg shadow-lg z-50"
-            @click="showCopyToast = false"
-            style="display: none;">
+            @click="showCopyToast = false" style="display: none;">
             ✓ Copied to clipboard!
         </div>
         <!-- Common Header -->
         <div class="p-4 flex justify-between items-center border-b border-gray-200 dark:border-gray-700">
             <button x-show="currentView === 'methods'">
-                <svg class="w-6 h-6 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" fill="none"
-                    stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-6 h-6 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 22V12h6v10" />
@@ -79,7 +76,8 @@
         <!-- Header -->
         <div class="px-6 py-3 bg-gray-50 dark:bg-gray-700/50">
             <div class="flex items-center gap-4">
-                <img src="{{ asset('assets/imgs/H-Pay.png') }}" class="w-12 h-12 rounded-md" alt="{{ config('app.name') }} Logo">
+                <img src="{{ asset('assets/imgs/H-Pay.png') }}" class="w-12 h-12 rounded-md"
+                    alt="{{ config('app.name') }} Logo">
                 <div>
                     <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
                         {{ config('app.name') }}</h2>
@@ -97,60 +95,32 @@
         <div x-show="currentView === 'methods'">
             <!-- Tabs -->
             <div class="flex border-b border-gray-200 dark:border-gray-700">
-                <button @click="activeTab = 'mobile'"
-                    :class="activeTab === 'mobile' ? 'border-green-500 text-green-600 dark:text-green-400' :
+                @foreach($gateways as $type => $method)
+                <button @click="activeTab = '{{$type}}'"
+                    :class="activeTab === '{{$type}}' ? 'border-green-500 text-green-600 dark:text-green-400' :
                         'border-transparent text-gray-500 dark:text-gray-400'"
                     class="flex-1 py-3 px-2 border-b-2 font-medium text-sm transition-colors">
-                    Mobile Banking
+                    {{ $method['name'] }}
                 </button>
-                <button @click="activeTab = 'ibanking'"
-                    :class="activeTab === 'ibanking' ? 'border-green-500 text-green-600 dark:text-green-400' :
-                        'border-transparent text-gray-500 dark:text-gray-400'"
-                    class="flex-1 py-3 px-2 border-b-2 font-medium text-sm transition-colors">
-                    Net Banking
-                </button>
-                <button @click="activeTab = 'international'"
-                    :class="activeTab === 'international' ? 'border-green-500 text-green-600 dark:text-green-400' :
-                        'border-transparent text-gray-500 dark:text-gray-400'"
-                    class="flex-1 py-3 px-2 border-b-2 font-medium text-sm transition-colors">
-                    International
-                </button>
+                @endforeach
             </div>
 
             <!-- Payment Methods Grid -->
             <div class="p-6">
-                <div class="grid grid-cols-3 gap-4 mb-6">
-                    <button @click="selectedMethod = '_bKash-Personal'; currentView = 'details'"
-                        class="flex flex-col items-center p-4 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-green-500 dark:hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all">
-                        <img src="https://freelogopng.com/images/all_img/1656227518bkash-logo-png.png" alt="bKash Logo" class="h-10">
-                        <span class="text-xs mt-1 font-medium text-center text-gray-700 dark:text-gray-300">bKash Personal</span>
-                    </button>
-                    <button @click="selectedMethod = '_bKash-Merchant'; currentView = 'details'"
-                        class="flex flex-col items-center p-4 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-green-500 dark:hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all">
-                        <img src="https://freelogopng.com/images/all_img/1656235602bkash-logo-black.png" alt="bKash Logo" class="h-10">
-                        <span class="text-xs mt-1 font-medium text-center text-gray-700 dark:text-gray-300">bKash Merchant</span>
-                    </button>
-                    <button @click="selectedMethod = '_Nagad-Personal'; currentView = 'details'"
-                        class="flex flex-col items-center p-4 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-green-500 dark:hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all">
-                        <img src="https://freelogopng.com/images/all_img/1683082228nagad-transparent-logo.png" alt="Nagad Logo" class="h-10">
-                        <span class="text-xs mt-1 font-medium text-center text-gray-700 dark:text-gray-300">Nagad Personal</span>
-                    </button>
-                    <button @click="selectedMethod = '_Rocket-Personal'; currentView = 'details'"
-                        class="flex flex-col items-center p-4 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-green-500 dark:hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all">
-                        <img src="https://images.seeklogo.com/logo-png/31/1/dutch-bangla-rocket-logo-png_seeklogo-317692.png" alt="Rocket Logo" class="h-10">
-                        <span class="text-xs mt-1 font-medium text-center text-gray-700 dark:text-gray-300">Rocket Personal</span>
-                    </button>
-                    <button @click="selectedMethod = '_Upay-Personal'; currentView = 'details'"
-                        class="flex flex-col items-center p-4 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-green-500 dark:hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all">
-                        <img src="https://images.seeklogo.com/logo-png/40/1/upay-logo-png_seeklogo-404483.png" alt="Upay Logo" class="h-10">
-                        <span class="text-xs mt-1 font-medium text-center text-gray-700 dark:text-gray-300">Upay Personal</span>
-                    </button>
-                    <button @click="selectedMethod = '_Cellfin-Personal'; currentView = 'details'"
-                        class="flex flex-col items-center p-4 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-green-500 dark:hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all">
-                        <img src="https://tmm.edu.bd/assets/images/CellFin.png" alt="Cellfin Logo" class="h-10">
-                        <span class="text-xs mt-1 font-medium text-center text-gray-700 dark:text-gray-300">Cellfin Personal</span>
-                    </button>
+                @foreach($gateways as $type => $method)
+                <div x-show="activeTab === '{{$type}}'" class="grid grid-cols-3 gap-4 mb-6">
+                    @forelse ($method['drivers'] as $driver)
+                        <button @click="selectedMethod = '{{ $driver['name'] }}'; currentView = 'details'"
+                            class="flex flex-col items-center p-4 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-green-500 dark:hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all">
+                            <img src="{{ route('plugins.image', ['plugin' => $driver['folder']]) }}" alt="{{ $driver['name'] }}" class="h-10">
+                            <span
+                                class="text-xs mt-1 font-medium text-center text-gray-700 dark:text-gray-300">{{ $driver['name'] }}</span>
+                        </button>
+                    @empty
+                        <p class="col-span-3 text-center text-gray-500 dark:text-gray-400">No payment methods available.</p>
+                    @endforelse
                 </div>
+                @endforeach
 
                 <!-- Pay Button -->
                 <button
@@ -173,16 +143,12 @@
         <div x-cloak x-show="selectedMethod">
             <div class="px-6 py-6">
                 <!-- Instructions -->
-                @foreach(File::allFiles(resource_path('views/filament/pages/_instructions')) as $instruction)
-                <template x-if="selectedMethod == '{{ str($instruction->getFilename())->replace('.blade.php', '')->toString() }}'">
-                    @include(
-                        str($instruction->getRelativePathname())
-                            ->replace('.blade.php', '')
-                            ->replace('/', '.')
-                            ->prepend('filament.pages._instructions.')
-                            ->toString()
-                    )
-                </template>
+                @foreach ($gateways as $type => $method)
+                    @foreach($method['drivers'] as $driver)
+                        <template x-if="selectedMethod == '{{ $driver['name'] }}'">
+                            @include($driver['instruction_view'])
+                        </template>
+                    @endforeach
                 @endforeach
 
                 <!-- Transaction ID Input -->

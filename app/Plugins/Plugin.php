@@ -45,6 +45,7 @@ abstract class Plugin extends ServiceProvider
     public function boot(): void
     {
         // Default boot logic, can be overridden by specific plugins
+        $this->loadViewsFrom(PluginLoader::getPluginPath($this->getFolder()).'/resources/views', $this->getFolder());
     }
 
     public function postActivation(): void
