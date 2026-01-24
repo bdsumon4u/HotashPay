@@ -17,13 +17,15 @@ return new class extends Migration
             $table->string('entry_type')->default('manual');
             $table->string('sim')->nullable();
             $table->text('message');
-            $table->string('provider');
+            $table->string('provider')->index();
             $table->decimal('amount', 15, 2)->default(0);
             $table->string('mobile');
-            $table->string('trxid');
+            $table->string('trxid')->index();
             $table->decimal('balance', 15, 2)->default(0);
             $table->string('status')->default('review');
             $table->timestamps();
+
+            $table->unique(['provider', 'trxid']);
         });
     }
 
