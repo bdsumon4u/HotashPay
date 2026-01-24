@@ -3,42 +3,42 @@
 namespace App\Http\Controllers;
 
 use App\Models\Device;
-use App\Models\SmsData;
-use App\Services\SmsParsingService;
+use App\Models\Transaction;
+use App\Payment\SmsParser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class WebhookController extends Controller
 {
-    public function __construct(private SmsParsingService $smsParser) {}
-
     public function handleSms(Request $request): JsonResponse
     {
-        $webhook = $request->query('webhook');
+        // $webhook = $request->query('webhook');
 
-        if (blank($webhook)) {
-            return response()->json([
-                'status' => false,
-                'message' => 'System is under maintenance. Please try again later.',
-            ], 400);
-        }
+        // if (blank($webhook)) {
+        //     return response()->json([
+        //         'status' => false,
+        //         'message' => 'System is under maintenance. Please try again later.',
+        //     ], 400);
+        // }
 
-        $setting = $this->getWebhookSetting($webhook);
+        // $setting = $this->getWebhookSetting($webhook);
 
-        if (! $setting) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Invalid Webhook',
-            ], 401);
-        }
+        // if (! $setting) {
+        //     return response()->json([
+        //         'status' => false,
+        //         'message' => 'Invalid Webhook',
+        //     ], 401);
+        // }
 
-        $this->handleDeviceConnection($request);
+        // $this->handleDeviceConnection($request);
 
-        $userAgent = $request->header('User-Agent');
+        // $userAgent = $request->header('User-Agent');
 
-        if ($userAgent === 'mh-piprapay-api-key') {
-            return $this->processSmsNotification($request);
-        }
+        $request->merge(json_decode('{"from":"bKash","text":"You have received payment Tk 500.00 from 01783110247. Fee Tk 0.00. Balance Tk 9,452.20. TrxID DAM6CTT7RW at 22/01/2026 01:54","sentStamp":1769025241000,"receivedStamp":1769025248417,"sim":"sim1"}', true));
+
+        // if ($userAgent === 'mh-piprapay-api-key') {
+        return $this->processSmsNotification($request);
+        // }
 
         return response()->json([
             'status' => true,
@@ -77,52 +77,25 @@ class WebhookController extends Controller
             'd_api_level' => $request->input('d_api_level'),
         ];
 
-        $device = Device::where($deviceData)->first();
-
-        $status = $request->input('connection_status', 'Connected');
-
-        if ($device) {
-            $device->update([
-                'd_status' => $status,
-                'created_at' => now(),
-            ]);
-        } else {
-            Device::create([
-                'd_id' => rand(),
-                'created_at' => now(),
-                'd_status' => 'Connected',
-                ...$deviceData,
-            ]);
-        }
+        Device::query()->updateOrCreate($deviceData, [
+            'd_status' => $request->input('connection_status', 'Connected'),
+        ]);
     }
 
     private function processSmsNotification(Request $request): JsonResponse
     {
-        $payload = $request->getContent();
-        $decoded = json_decode($payload, true) ?? [];
+        $from = $request->input('from', '');
+        $text = $request->input('text', '');
+        $sentStamp = $request->input('sentStamp', '');
+        $receivedStamp = $request->input('receivedStamp', now()->toDateTimeString());
+        $sim = $this->normalizeSim($decoded['sim'] ?? $request->input('sim', 1));
 
-        $from = $decoded['from'] ?? $request->input('from', '');
-        $text = $decoded['text'] ?? $request->input('text', '');
-        $sentStamp = $decoded['sentStamp'] ?? $request->input('sentStamp', '');
-        $receivedStamp = $decoded['receivedStamp'] ?? $request->input('receivedStamp', now()->toDateTimeString());
-        $sim = $decoded['sim'] ?? $request->input('sim', 1);
-
-        $sim = $this->normalizeSim($sim);
-
-        $parsingResult = $this->smsParser->parse($from, $text, $receivedStamp);
-
-        if ($parsingResult) {
-            SmsData::create([
+        if ($parsingResult = SmsParser::parse($from, $text, $receivedStamp)) {
+            Transaction::create([
                 'entry_type' => 'automatic',
                 'sim' => $sim,
-                'payment_method' => $parsingResult['provider'],
-                'mobile_number' => $parsingResult['mobile'],
-                'transaction_id' => $parsingResult['trxid'],
-                'amount' => $parsingResult['amount'],
-                'balance' => $parsingResult['balance'],
                 'message' => $text,
-                'status' => $parsingResult['status'],
-                'created_at' => $parsingResult['datetime'],
+                ...$parsingResult,
             ]);
 
             return response()->json([
@@ -142,7 +115,7 @@ class WebhookController extends Controller
         return match ($sim) {
             1, '1' => 'sim1',
             2, '2' => 'sim2',
-            default => "sim{$sim}",
+            default => $sim,
         };
     }
 }

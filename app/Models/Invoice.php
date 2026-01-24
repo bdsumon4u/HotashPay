@@ -5,13 +5,17 @@ namespace App\Models;
 use App\Casts\UlidBinaryCast;
 use App\Enums\InvoiceStatus;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 use Symfony\Component\Uid\Ulid;
 
 class Invoice extends Model
 {
+    use HasFactory;
+
     protected static function booted(): void
     {
         self::creating(function (Invoice $invoice): void {
@@ -35,7 +39,7 @@ class Invoice extends Model
 
         $record = parent::resolveRouteBinding($value, $field);
 
-        throw_unless($record, (new ModelNotFoundException())->setModel(self::class, [$value]));
+        throw_unless($record, (new ModelNotFoundException)->setModel(self::class, [$value]));
 
         return $record;
     }
@@ -43,28 +47,33 @@ class Invoice extends Model
     public function paymentUrl(): Attribute
     {
         return Attribute::get(
-            fn (): string => 'https://pay.hotash.com/invoice/' . mb_strtolower($this->ulid),
+            fn (): string => route('invoices.pay', ['invoice' => $this->ulid]),
         );
     }
 
     public function redirectUrl(): Attribute
     {
         return Attribute::get(
-            fn (): ?string => $this->attributes['redirect_url'],
+            fn (): ?string => $this->attributes['redirect_url'] ?? url('/payment-successful'),
         );
     }
 
     public function cancelUrl(): Attribute
     {
         return Attribute::get(
-            fn (): ?string => $this->attributes['cancel_url'],
+            fn (): ?string => $this->attributes['cancel_url'] ?? url('/payment-cancelled'),
         );
     }
 
     public function webhookUrl(): Attribute
     {
         return Attribute::get(
-            fn (): ?string => $this->attributes['webhook_url'],
+            fn (): ?string => $this->attributes['webhook_url'] ?? url('api/payment-webhook'),
         );
+    }
+
+    public function transactions(): HasMany
+    {
+        return $this->hasMany(Transaction::class);
     }
 }

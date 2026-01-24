@@ -14,4 +14,4 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // Webhook routes (public, no authentication required)
-Route::post('/webhook/sms', [WebhookController::class, 'handleSms']);
+Route::any('/webhook/sms', [WebhookController::class, 'handleSms']);

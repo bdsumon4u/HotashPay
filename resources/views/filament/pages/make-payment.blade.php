@@ -8,8 +8,6 @@
 
 <div class="flex items-center justify-center" x-data="{
     currentView: 'methods',
-    selectedMethod: null,
-    transactionId: '',
     showCopyToast: false,
     activeTab: 'mobile',
     copyToClipboard(text) {
@@ -35,7 +33,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 22V12h6v10" />
                 </svg>
             </button>
-            <button x-cloak x-show="currentView === 'details'" @click="currentView = 'methods'; selectedMethod = null;"
+            <button x-cloak x-show="currentView === 'details'" @click="currentView = 'methods'; $wire.set('selectedProvider', null);"
                 class="text-green-500 hover:text-green-600 dark:text-green-400 dark:hover:text-green-300">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -85,8 +83,14 @@
                         {{ $invoice->amount }} {{ $invoice->currency }}</p>
                 </div>
                 <!-- Method Logo -->
-                <div class="flex justify-center ml-auto">
-                    <div class="text-6xl" x-text="selectedMethod?.logo"></div>
+                <div class="flex justify-center ml-auto" x-show="$wire.selectedProvider">
+                    @foreach ($gateways as $type => $method)
+                        @foreach($method['drivers'] as $driver)
+                            <template x-if="$wire.selectedProvider === '{{ $driver['folder'] }}'">
+                                <img src="{{ route('plugins.image', ['plugin' => $driver['folder']]) }}" alt="{{ $driver['name'] }}" class="h-12">
+                            </template>
+                        @endforeach
+                    @endforeach
                 </div>
             </div>
         </div>
@@ -110,7 +114,7 @@
                 @foreach($gateways as $type => $method)
                 <div x-show="activeTab === '{{$type}}'" class="grid grid-cols-3 gap-4 mb-6">
                     @forelse ($method['drivers'] as $driver)
-                        <button @click="selectedMethod = '{{ $driver['name'] }}'; currentView = 'details'"
+                        <button @click="$wire.set('selectedProvider', '{{ $driver['folder'] }}'); currentView = 'details'"
                             class="flex flex-col items-center p-4 border-2 border-gray-200 dark:border-gray-700 rounded-lg hover:border-green-500 dark:hover:border-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-all">
                             <img src="{{ route('plugins.image', ['plugin' => $driver['folder']]) }}" alt="{{ $driver['name'] }}" class="h-10">
                             <span
@@ -140,12 +144,12 @@
         </div>
 
         <!-- Payment Details View Body -->
-        <div x-cloak x-show="selectedMethod">
+        <div x-cloak x-show="$wire.selectedProvider">
             <div class="px-6 py-6">
                 <!-- Instructions -->
                 @foreach ($gateways as $type => $method)
                     @foreach($method['drivers'] as $driver)
-                        <template x-if="selectedMethod == '{{ $driver['name'] }}'">
+                        <template x-if="$wire.selectedProvider === '{{ $driver['folder'] }}'">
                             @include($driver['instruction_view'])
                         </template>
                     @endforeach
@@ -155,14 +159,21 @@
                 <div class="mb-4">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Transaction
                         ID</label>
-                    <input x-model="transactionId" type="text" placeholder="Enter Transaction ID"
-                        class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                    <input wire:model="transactionId" type="text" placeholder="Enter Transaction ID"
+                        class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                        :disabled="$wire.isVerifying">
                 </div>
 
                 <!-- Verify Button -->
-                <button
-                    class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors">
-                    Verify
+                <button wire:click="verifyTransaction" :disabled="$wire.isVerifying"
+                    class="w-full bg-green-500 hover:bg-green-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                    <template x-if="$wire.isVerifying">
+                        <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </template>
+                    <span x-text="$wire.isVerifying ? 'Verifying...' : 'Verify'"></span>
                 </button>
 
                 <!-- Security Note -->
