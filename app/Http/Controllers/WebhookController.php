@@ -12,33 +12,33 @@ class WebhookController extends Controller
 {
     public function handleSms(Request $request): JsonResponse
     {
-        // $webhook = $request->query('webhook');
+        $webhook = $request->query('webhook');
 
-        // if (blank($webhook)) {
-        //     return response()->json([
-        //         'status' => false,
-        //         'message' => 'System is under maintenance. Please try again later.',
-        //     ], 400);
-        // }
+        if (blank($webhook)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'System is under maintenance. Please try again later.',
+            ], 400);
+        }
 
-        // $setting = $this->getWebhookSetting($webhook);
+        $setting = $this->getWebhookSetting($webhook);
 
-        // if (! $setting) {
-        //     return response()->json([
-        //         'status' => false,
-        //         'message' => 'Invalid Webhook',
-        //     ], 401);
-        // }
+        if (! $setting) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Invalid Webhook',
+            ], 401);
+        }
 
-        // $this->handleDeviceConnection($request);
+        $this->handleDeviceConnection($request);
 
-        // $userAgent = $request->header('User-Agent');
+        $userAgent = $request->header('User-Agent');
 
         $request->merge(json_decode('{"from":"bKash","text":"You have received payment Tk 500.00 from 01783110247. Fee Tk 0.00. Balance Tk 9,452.20. TrxID DAM6CTT7RW at 22/01/2026 01:54","sentStamp":1769025241000,"receivedStamp":1769025248417,"sim":"sim1"}', true));
 
-        // if ($userAgent === 'mh-piprapay-api-key') {
-        return $this->processSmsNotification($request);
-        // }
+        if ($userAgent === 'HT-HP-APP') {
+            return $this->processSmsNotification($request);
+        }
 
         return response()->json([
             'status' => true,
@@ -66,19 +66,15 @@ class WebhookController extends Controller
 
     private function handleDeviceConnection(Request $request): void
     {
-        if (! $request->filled(['d_model', 'd_brand', 'd_version', 'd_api_level'])) {
-            return;
-        }
+        $data = $request->validate([
+            'model' => 'required|string',
+            'brand' => 'required|string',
+            'version' => 'required|string',
+            'api_level' => 'required|string',
+        ]);
 
-        $deviceData = [
-            'd_model' => $request->input('d_model'),
-            'd_brand' => $request->input('d_brand'),
-            'd_version' => $request->input('d_version'),
-            'd_api_level' => $request->input('d_api_level'),
-        ];
-
-        Device::query()->updateOrCreate($deviceData, [
-            'd_status' => $request->input('connection_status', 'Connected'),
+        Device::query()->updateOrCreate($data, [
+            'status' => $request->input('connection_status', 'Connected'),
         ]);
     }
 
@@ -88,26 +84,20 @@ class WebhookController extends Controller
         $text = $request->input('text', '');
         $sentStamp = $request->input('sentStamp', '');
         $receivedStamp = $request->input('receivedStamp', now()->toDateTimeString());
-        $sim = $this->normalizeSim($decoded['sim'] ?? $request->input('sim', 1));
+        $sim = $this->normalizeSim($request->input('sim', 1));
 
-        if ($parsingResult = SmsParser::parse($from, $text, $receivedStamp)) {
-            Transaction::create([
-                'entry_type' => 'automatic',
-                'sim' => $sim,
-                'message' => $text,
-                ...$parsingResult,
-            ]);
-
-            return response()->json([
-                'status' => true,
-                'message' => 'SMS processed successfully',
-            ]);
+        if (! $parsed = SmsParser::parse($from, $text, $receivedStamp)) {
+            return response()->json(['status' => false, 'message' => 'Failed to parse SMS'], 422);
         }
 
-        return response()->json([
-            'status' => false,
-            'message' => 'Failed to parse SMS',
-        ], 422);
+        Transaction::create([
+            'entry_type' => 'automatic',
+            'sim' => $sim,
+            'message' => $text,
+            ...$parsed,
+        ]);
+
+        return response()->json(['status' => true, 'message' => 'SMS processed successfully']);
     }
 
     private function normalizeSim(int|string $sim): string
@@ -115,7 +105,7 @@ class WebhookController extends Controller
         return match ($sim) {
             1, '1' => 'sim1',
             2, '2' => 'sim2',
-            default => $sim,
+            default => (string) $sim,
         };
     }
 }

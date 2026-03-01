@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\MoneyCast;
 use App\Casts\UlidBinaryCast;
 use App\Enums\InvoiceStatus;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -28,6 +29,8 @@ class Invoice extends Model
         return [
             'ulid' => UlidBinaryCast::class,
             'status' => InvoiceStatus::class,
+            'metadata' => 'array',
+            'amount' => MoneyCast::class,
         ];
     }
 

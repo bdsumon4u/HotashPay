@@ -123,17 +123,33 @@ class MakePayment extends SimplePage
         }
 
         try {
-            Http::timeout(10)->post($this->invoice->webhook_url, [
-                'invoice_id' => $this->invoice->id,
-                'ulid' => $this->invoice->ulid,
-                'amount' => $this->invoice->amount,
-                'currency' => $this->invoice->currency,
-                'status' => $this->invoice->status->value,
-                'client_name' => $this->invoice->client_name,
-                'client_email' => $this->invoice->client_email,
-                'client_phone' => $this->invoice->client_phone,
-                'paid_at' => now()->toDateTimeString(),
-            ]);
+            $response = Http::timeout(10)
+                ->acceptJson()
+                ->post($this->invoice->webhook_url, [
+                    'invoice_id' => $this->invoice->id,
+                    'ulid' => $this->invoice->ulid,
+                    'amount' => $this->invoice->amount,
+                    'currency' => $this->invoice->currency,
+                    'status' => $this->invoice->status->value,
+                    'client_name' => $this->invoice->client_name,
+                    'client_email' => $this->invoice->client_email,
+                    'client_phone' => $this->invoice->client_phone,
+                    'paid_at' => now()->toDateTimeString(),
+                    'metadata' => $this->invoice->metadata,
+                ]);
+
+            if ($response->failed()) {
+                Log::error('Webhook posting failed', [
+                    'invoice_id' => $this->invoice->id,
+                    'status' => $response->status(),
+                    'body' => $response->json(),
+                ]);
+            } else {
+                Log::info('Webhook posted successfully', [
+                    'invoice_id' => $this->invoice->id,
+                    'status' => $response->status(),
+                ]);
+            }
         } catch (\Exception $e) {
             // Log the error but don't fail the payment
             Log::error('Webhook posting failed', [

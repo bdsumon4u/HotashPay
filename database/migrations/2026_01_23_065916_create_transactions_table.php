@@ -20,9 +20,10 @@ return new class extends Migration
             $table->string('provider')->index();
             $table->decimal('amount', 15, 2)->default(0);
             $table->string('mobile');
-            $table->string('trxid')->index();
+            $table->string('trxid')->nullable()->index();
             $table->decimal('balance', 15, 2)->default(0);
             $table->string('status')->default('review');
+            $table->timestamp('received_at')->nullable();
             $table->timestamps();
 
             $table->unique(['provider', 'trxid']);

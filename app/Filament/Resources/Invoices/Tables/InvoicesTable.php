@@ -7,6 +7,7 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -17,7 +18,13 @@ class InvoicesTable
         return $table
             ->columns([
                 TextColumn::make('id')
-                    ->label('ID'),
+                    ->label('ID')
+                    ->sortable()
+                    ->searchable(),
+                TextColumn::make('invoice_id')
+                    ->label('Invoice ID')
+                    ->sortable()
+                    ->searchable(),
                 TextColumn::make('client_name')
                     ->label('Name')
                     ->searchable(),
@@ -49,7 +56,9 @@ class InvoicesTable
                 //
             ])
             ->recordActions([
-                EditAction::make(),
+                EditAction::make()
+                    ->slideOver()
+                    ->modalWidth(Width::Medium),
                 Action::make('pay')
                     ->label('Pay')
                     ->icon('heroicon-o-credit-card')

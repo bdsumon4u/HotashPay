@@ -1,0 +1,50 @@
+# Deploy to cPanel when pushing/merging to production.
+# Required GitHub secrets: SSH_PRIVATE_KEY, REMOTE_HOST, REMOTE_USER, REMOTE_PATH.
+# Optional: REMOTE_PORT (default 22 if unset in the action).
+# Server uses ./php and ./php $(which composer); npm is built on GitHub only. .git is deployed.
+name: Deploy to cPanel (Production)
+
+on:
+  push:
+    branches:
+      - production
+
+jobs:
+  deploy:
+    name: Deploy to cPanel
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Build assets
+        run: |
+          npm ci
+          npm run build
+
+      - name: Deploy via SSH
+        uses: easingthemes/ssh-deploy@v5.1.0
+        with:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+          REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          REMOTE_PORT: ${{ secrets.REMOTE_PORT || '22' }}
+          TARGET: ${{ secrets.REMOTE_PATH }}
+          SOURCE: ./
+          EXCLUDE: "node_modules, vendor, .env, .env.*, .github, storage/logs/*, storage/framework/cache/*, storage/framework/sessions/*, .phpunit.result.cache, npm-debug.log*, .idea, .vscode"
+          SCRIPT_BEFORE: |
+            ./php artisan down
+          SCRIPT_AFTER: |
+            COMPOSER="$([ -f "./composer.phar" ] && echo "./composer.phar" || command -v composer || echo /opt/cpanel/composer/bin/composer)"
+            ./php "$COMPOSER" install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+            ./php artisan migrate --force
+            ./php artisan storage:link
+            ./php artisan optimize
+            ./php artisan up

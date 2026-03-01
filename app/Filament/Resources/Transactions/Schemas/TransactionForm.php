@@ -12,13 +12,12 @@ class TransactionForm
     {
         return $schema
             ->components([
-                TextInput::make('entry_type')
-                    ->label('Entry Type')
-                    ->default('manual')
-                    ->required(),
-                TextInput::make('sim')
+                TextInput::make('provider')
                     ->label('Sender')
                     ->required(),
+                TextInput::make('status')
+                    ->disabled()
+                    ->dehydrated(),
                 Textarea::make('message')
                     ->required()
                     ->columnSpanFull(),
@@ -35,9 +34,6 @@ class TransactionForm
                     ->dehydrated(),
                 TextInput::make('balance')
                     ->numeric()
-                    ->disabled()
-                    ->dehydrated(),
-                TextInput::make('status')
                     ->disabled()
                     ->dehydrated(),
             ])

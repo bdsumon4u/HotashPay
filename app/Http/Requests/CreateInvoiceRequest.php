@@ -25,11 +25,12 @@ class CreateInvoiceRequest extends FormRequest
             'client_name' => 'required|string|max:255',
             'client_email' => 'required_without:client_phone|email|max:255|nullable',
             'client_phone' => 'required_without:client_email|string|max:20|nullable',
-            'amount' => 'required|integer|min:1',
+            'amount' => 'required|numeric|gt:0',
             'currency' => 'nullable|string|size:3',
             'redirect_url' => 'nullable|url',
             'cancel_url' => 'nullable|url',
             'webhook_url' => 'nullable|url',
+            'metadata' => 'array',
         ];
     }
 }

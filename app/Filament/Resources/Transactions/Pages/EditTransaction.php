@@ -20,21 +20,12 @@ class EditTransaction extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        if (isset($data['sim']) && isset($data['message'])) {
-            $parsed = SmsParser::parse(
-                $data['sim'],
+        if (isset($data['provider']) && isset($data['message'])) {
+            $data += SmsParser::parse(
+                $data['provider'],
                 $data['message'],
-                now()->toDateTimeString()
-            );
-
-            if ($parsed) {
-                $data['provider'] = $parsed['provider'];
-                $data['amount'] = $parsed['amount'];
-                $data['mobile'] = $parsed['mobile'];
-                $data['trxid'] = $parsed['trxid'];
-                $data['balance'] = $parsed['balance'];
-                $data['status'] = $parsed['status'];
-            }
+                now()->toDateTimeString(),
+            ) ?? [];
         }
 
         return $data;

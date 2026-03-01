@@ -3,10 +3,12 @@
 namespace App\Filament\Resources\Invoices\Schemas;
 
 use App\Enums\InvoiceStatus;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Str;
 
 class InvoiceForm
 {
@@ -14,6 +16,10 @@ class InvoiceForm
     {
         return $schema
             ->components([
+                TextInput::make('invoice_id')
+                    ->label('Invoice ID')
+                    ->required()
+                    ->default(fn (): string => Str::random(10)),
                 TextInput::make('client_name')
                     ->label('Name')
                     ->required()
@@ -30,11 +36,12 @@ class InvoiceForm
                 TextInput::make('currency')
                     ->required()
                     ->default('BDT'),
-                Select::make('status')
+                Radio::make('status')
                     ->options(InvoiceStatus::class)
-                    ->enum(InvoiceStatus::class)
+                    ->default(InvoiceStatus::PENDING)
                     ->required()
-                    ->native(false),
+                    ->inline()
+                    ->columnSpanFull(),
                 Textarea::make('redirect_url')
                     ->columnSpanFull(),
                 Textarea::make('cancel_url')

@@ -26,7 +26,7 @@ class BkashMerchantPlugin extends Plugin
 
     public function getName(): string
     {
-        return 'bKash Merchant Payment';
+        return 'bKash Merchant';
     }
 
     public function postActivation(): void

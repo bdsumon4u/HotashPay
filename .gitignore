@@ -31,3 +31,5 @@ yarn-error.log
 /.junie/mcp/mcp.json
 .mcp.json
 opencode.json
+
+.early.coverage

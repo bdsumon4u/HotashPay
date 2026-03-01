@@ -10,43 +10,43 @@ class SmsParser
 {
     public static function parse(string $from, string $text, string $receivedStamp): ?array
     {
-        if (! $provider = self::matchProvider($from)) {
+        if (! $providers = self::matchProviders($from)) {
             return null;
         }
 
-        foreach ($provider->getMessageFormats() as $format) {
-            if (preg_match($format, $text, $matches)) {
-                $matches['status'] = 'approved';
-                break;
+        foreach ($providers as $provider) {
+            foreach ($provider->getMessageFormats() as $format) {
+                if (preg_match($format, $text, $matches)) {
+                    $matches['provider'] = $provider->getId();
+                    $matches['status'] = 'approved';
+                    goto finish;
+                }
             }
         }
 
+        finish:
+
         return [
-            'provider' => $provider->getId(),
+            'provider' => $matches['provider'] ?? $from,
             'amount' => (string) str_replace(',', '', $matches['amount'] ?? '0'),
             'mobile' => $matches['mobile'] ?? '--',
-            'trxid' => $matches['trxid'] ?? '--',
+            'trxid' => $matches['trxid'] ?? null,
             'balance' => (string) str_replace(',', '', $matches['balance'] ?? '0'),
-            'created_at' => self::parseDateTime($matches),
+            'received_at' => self::parseDateTime($matches) ?? $receivedStamp,
             'status' => $matches['status'] ?? 'review',
         ];
     }
 
-    private static function matchProvider(string $from): ?PaymentDriver
+    private static function matchProviders(string $from): array
     {
         $sender = trim($from);
 
-        $paymentManager = app(PaymentManager::class);
-        foreach ($paymentManager->getDrivers() as $driver) {
-            if (in_array($sender, $driver->getAliases())) {
-                return $driver;
-            }
-        }
-
-        return null;
+        return collect(app(PaymentManager::class)->getDrivers())
+            ->filter(fn ($driver) => in_array($sender, $driver->getAliases()))
+            ->toArray();
     }
 
-    private static function parseDateTime(array $matches): string
+    private static function parseDateTime(array $matches): ?string
     {
         try {
             if (isset($matches['datetime'])) {
@@ -65,6 +65,6 @@ class SmsParser
             Log::warning('Failed to parse SMS datetime', ['matches' => $matches]);
         }
 
-        return now()->toDateTimeString();
+        return null;
     }
 }

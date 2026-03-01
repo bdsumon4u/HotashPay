@@ -14,6 +14,7 @@ return new class extends Migration
     {
         Schema::create('invoices', function (Blueprint $table) {
             $table->id()->startingValue(1001);
+            $table->string('invoice_id')->unique();
             $table->binary('ulid', 16)->unique();
             $table->string('client_name')->default('Mr. X');
             $table->string('client_email')->nullable();
@@ -24,6 +25,7 @@ return new class extends Migration
             $table->text('redirect_url')->nullable();
             $table->text('cancel_url')->nullable();
             $table->text('webhook_url')->nullable();
+            $table->json('metadata')->nullable();
             $table->timestamps();
         });
     }
