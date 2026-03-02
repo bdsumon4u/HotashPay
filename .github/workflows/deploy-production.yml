@@ -49,8 +49,10 @@ jobs:
           SOURCE: ./
           EXCLUDE: "node_modules, vendor, .env, .env.*, .github, storage/logs/*, storage/framework/cache/*, storage/framework/sessions/*, .phpunit.result.cache, npm-debug.log*, .idea, .vscode"
           SCRIPT_BEFORE: |
+            pwd
             ./php artisan down
           SCRIPT_AFTER: |
+            pwd
             COMPOSER="$([ -f "./composer.phar" ] && echo "./composer.phar" || command -v composer || echo /opt/cpanel/composer/bin/composer)"
             ./php "$COMPOSER" install --no-dev --no-interaction --prefer-dist --optimize-autoloader
             ./php artisan migrate --force
