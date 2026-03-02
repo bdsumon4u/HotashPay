@@ -49,13 +49,24 @@ jobs:
           SOURCE: ./
           EXCLUDE: "node_modules, vendor, .env, .env.*, .github, storage/logs/*, storage/framework/cache/*, storage/framework/sessions/*, .phpunit.result.cache, npm-debug.log*, .idea, .vscode"
           SCRIPT_BEFORE: |
+            cd "${{ secrets.REMOTE_PATH }}"
             pwd
-            ./php artisan down
+            if [ -x ./php ]; then
+              ./php artisan down
+            else
+              php artisan down
+            fi
           SCRIPT_AFTER: |
+            cd "${{ secrets.REMOTE_PATH }}"
             pwd
             COMPOSER="$([ -f "./composer.phar" ] && echo "./composer.phar" || command -v composer || echo /opt/cpanel/composer/bin/composer)"
-            ./php "$COMPOSER" install --no-dev --no-interaction --prefer-dist --optimize-autoloader
-            ./php artisan migrate --force
-            ./php artisan storage:link
-            ./php artisan optimize
-            ./php artisan up
+            if [ -x ./php ]; then
+              PHP_BIN=./php
+            else
+              PHP_BIN=php
+            fi
+            "$PHP_BIN" "$COMPOSER" install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+            "$PHP_BIN" artisan migrate --force
+            "$PHP_BIN" artisan storage:link
+            "$PHP_BIN" artisan optimize
+            "$PHP_BIN" artisan up
