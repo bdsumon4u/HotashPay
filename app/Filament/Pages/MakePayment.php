@@ -133,6 +133,7 @@ class MakePayment extends SimplePage
                 ->acceptJson()
                 ->post($this->invoice->webhook_url, [
                     'invoice_id' => $this->invoice->invoice_id,
+                    'trxid' => $this->invoice->transaction->trxid,
                     'ulid' => $this->invoice->ulid,
                     'amount' => $this->invoice->amount,
                     'currency' => $this->invoice->currency,
