@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\CreateInvoiceRequest;
 use App\Models\Invoice;
 
-class CreateInvoiceController extends Controller
+class ChargeController extends Controller
 {
     /**
      * Handle the incoming request.
@@ -18,7 +18,8 @@ class CreateInvoiceController extends Controller
 
         return response()->json([
             'status' => true,
-            'invoice_id' => $invoice->ulid,
+            'ulid' => $invoice->ulid,
+            'invoice_id' => $invoice->invoice_id,
             'payment_url' => $invoice->payment_url,
             'message' => 'Invoice created successfully.',
         ], 201);

@@ -7,7 +7,7 @@ use Filament\Support\Contracts\HasIcon;
 use Filament\Support\Contracts\HasLabel;
 use Illuminate\Contracts\Support\Htmlable;
 
-enum InvoiceStatus: string implements HasLabel, HasIcon, HasColor
+enum InvoiceStatus: string implements HasColor, HasIcon, HasLabel
 {
     case PENDING = 'pending';
     case PAID = 'paid';
@@ -15,7 +15,7 @@ enum InvoiceStatus: string implements HasLabel, HasIcon, HasColor
 
     public function getLabel(): string|Htmlable|null
     {
-        return match($this) {
+        return match ($this) {
             self::PENDING => 'Pending',
             self::PAID => 'Paid',
             self::CANCELED => 'Canceled',
@@ -24,7 +24,7 @@ enum InvoiceStatus: string implements HasLabel, HasIcon, HasColor
 
     public function getIcon(): ?string
     {
-        return match($this) {
+        return match ($this) {
             self::PENDING => 'heroicon-o-clock',
             self::PAID => 'heroicon-o-check-circle',
             self::CANCELED => 'heroicon-o-x-circle',
@@ -33,7 +33,7 @@ enum InvoiceStatus: string implements HasLabel, HasIcon, HasColor
 
     public function getColor(): ?string
     {
-        return match($this) {
+        return match ($this) {
             self::PENDING => 'warning',
             self::PAID => 'success',
             self::CANCELED => 'danger',

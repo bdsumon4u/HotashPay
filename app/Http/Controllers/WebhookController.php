@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\Enums\DeviceStatus;
 use App\Models\Device;
 use App\Models\Transaction;
 use App\Payment\SmsParser;
@@ -10,35 +11,41 @@ use Illuminate\Http\Request;
 
 class WebhookController extends Controller
 {
-    public function handleSms(Request $request): JsonResponse
+    public function __invoke(Request $request): JsonResponse
     {
-        $webhook = $request->query('webhook');
+        info('webhook received', $request->all());
+        // $webhook = $request->query('webhook');
 
-        if (blank($webhook)) {
-            return response()->json([
-                'status' => false,
-                'message' => 'System is under maintenance. Please try again later.',
-            ], 400);
-        }
+        // if (blank($webhook)) {
+        //     info('webhook blank');
+        //     return response()->json([
+        //         'status' => false,
+        //         'message' => 'System is under maintenance. Please try again later.',
+        //     ], 400);
+        // }
 
-        $setting = $this->getWebhookSetting($webhook);
+        // $setting = $this->getWebhookSetting($webhook);
 
-        if (! $setting) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Invalid Webhook',
-            ], 401);
-        }
+        // if (! $setting) {
+        //     info('no settings');
+        //     return response()->json([
+        //         'status' => false,
+        //         'message' => 'Invalid Webhook',
+        //     ], 401);
+        // }
 
         $this->handleDeviceConnection($request);
 
         $userAgent = $request->header('User-Agent');
+        info('user agent: '.$userAgent);
 
-        $request->merge(json_decode('{"from":"bKash","text":"You have received payment Tk 500.00 from 01783110247. Fee Tk 0.00. Balance Tk 9,452.20. TrxID DAM6CTT7RW at 22/01/2026 01:54","sentStamp":1769025241000,"receivedStamp":1769025248417,"sim":"sim1"}', true));
+        // $request->merge(json_decode('{"from":"bKash","text":"You have received payment Tk 500.00 from 01783110247. Fee Tk 0.00. Balance Tk 9,452.20. TrxID DAM6CTT7RW at 22/01/2026 01:54","sentStamp":1769025241000,"receivedStamp":1769025248417,"sim":"sim1"}', true));
 
         if ($userAgent === 'HT-HP-APP') {
             return $this->processSmsNotification($request);
         }
+
+        info('webhook received');
 
         return response()->json([
             'status' => true,
@@ -66,16 +73,13 @@ class WebhookController extends Controller
 
     private function handleDeviceConnection(Request $request): void
     {
-        $data = $request->validate([
-            'model' => 'required|string',
-            'brand' => 'required|string',
-            'version' => 'required|string',
-            'api_level' => 'required|string',
-        ]);
-
-        Device::query()->updateOrCreate($data, [
-            'status' => $request->input('connection_status', 'Connected'),
-        ]);
+        if ($request->has($keys = ['model', 'brand', 'version', 'api_level'])) {
+            info('before device update or create');
+            Device::query()->updateOrCreate($request->only($keys), [
+                'status' => $request->input('connection_status', DeviceStatus::CONNECTED),
+            ]);
+            info('after device update or create');
+        }
     }
 
     private function processSmsNotification(Request $request): JsonResponse
@@ -86,16 +90,22 @@ class WebhookController extends Controller
         $receivedStamp = $request->input('receivedStamp', now()->toDateTimeString());
         $sim = $this->normalizeSim($request->input('sim', 1));
 
+        info('processing');
+
         if (! $parsed = SmsParser::parse($from, $text, $receivedStamp)) {
+            info('not parsed');
+
             return response()->json(['status' => false, 'message' => 'Failed to parse SMS'], 422);
         }
 
+        info('before transaction');
         Transaction::create([
             'entry_type' => 'automatic',
             'sim' => $sim,
             'message' => $text,
             ...$parsed,
         ]);
+        info('after transaction');
 
         return response()->json(['status' => true, 'message' => 'SMS processed successfully']);
     }

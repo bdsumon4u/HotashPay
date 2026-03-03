@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Plugins\Facades\PluginManager;
-use App\Plugins\Plugin;
 use App\Plugins\PluginLoader;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;

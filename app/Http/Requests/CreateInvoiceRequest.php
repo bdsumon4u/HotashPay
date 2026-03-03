@@ -22,6 +22,7 @@ class CreateInvoiceRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'invoice_id' => 'required|string|max:255|unique:invoices,invoice_id',
             'client_name' => 'required|string|max:255',
             'client_email' => 'required_without:client_phone|email|max:255|nullable',
             'client_phone' => 'required_without:client_email|string|max:20|nullable',
@@ -30,7 +31,7 @@ class CreateInvoiceRequest extends FormRequest
             'redirect_url' => 'nullable|url',
             'cancel_url' => 'nullable|url',
             'webhook_url' => 'nullable|url',
-            'metadata' => 'array',
+            'metadata' => 'nullable|array',
         ];
     }
 }

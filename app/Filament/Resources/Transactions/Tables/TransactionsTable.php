@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Transactions\Tables;
 
-use App\Models\Transaction;
 use App\Payment\PaymentManager;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
