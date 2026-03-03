@@ -2,11 +2,13 @@
 
 namespace App\Filament\Resources\Transactions\Tables;
 
-use App\Models\Transaction;
+use App\Filament\Resources\Invoices\InvoiceResource;
+use App\Filament\Resources\Transactions\Schemas\TransactionForm;
 use App\Payment\PaymentManager;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -36,6 +38,16 @@ class TransactionsTable
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('status')
                     ->searchable(),
+                TextColumn::make('invoice.invoice_id')
+                    ->label('Invoice')
+                    ->searchable()
+                    ->sortable()
+                    ->url(fn ($record) => $record->invoice_id ? InvoiceResource::getUrl('view', ['record' => $record->invoice_id]) : null)
+                    ->openUrlInNewTab(),
+                TextColumn::make('received_at')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -64,8 +76,11 @@ class TransactionsTable
             ])
             ->recordActions([
                 EditAction::make()
-                    ->modal()
-                    ->modalWidth(Width::Small),
+                    ->schema(fn (Schema $schema) => $schema->components(
+                        TransactionForm::parsedDataSchema()
+                    )->columns(2))
+                    ->slideOver()
+                    ->modalWidth(Width::Medium),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

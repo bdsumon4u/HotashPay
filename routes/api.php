@@ -1,6 +1,6 @@
 <?php
 
-use App\Http\Controllers\CreateInvoiceController;
+use App\Http\Controllers\ChargeController;
 use App\Http\Controllers\WebhookController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -10,8 +10,8 @@ Route::get('/user', function (Request $request) {
 })->middleware('auth:sanctum');
 
 Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/create-invoice', CreateInvoiceController::class);
+    Route::post('/charge', ChargeController::class);
 });
 
 // Webhook routes (public, no authentication required)
-Route::any('/webhook/sms', [WebhookController::class, 'handleSms']);
+Route::any('/webhook', WebhookController::class);

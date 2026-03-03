@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static void deletePlugin(string $pluginFolder)
  * @method static ?Plugin loadPluginInstance(string $folder)
  * @method static bool isPluginActive(string $folder)
- * 
+ *
  * @see \App\Plugins\PluginManager
  */
 class PluginManager extends Facade

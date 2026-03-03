@@ -8,6 +8,7 @@ use App\Models\Transaction;
 use App\Payment\PaymentManager;
 use Filament\Notifications\Notification;
 use Filament\Pages\SimplePage;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -71,49 +72,54 @@ class MakePayment extends SimplePage
             return;
         }
 
-        // Find matching unclaimed transaction
-        $transaction = Transaction::query()
-            ->where('provider', $this->selectedProvider)
-            ->where('trxid', $this->transactionId)
-            ->where('amount', $this->invoice->amount)
-            ->whereNull('invoice_id')
-            ->where('status', 'approved')
-            ->first();
+        try {
+            DB::transaction(function (): void {
+                // Find matching unclaimed transaction
+                $transaction = Transaction::query()
+                    ->where('provider', $this->selectedProvider)
+                    ->where('trxid', $this->transactionId)
+                    ->where('amount', $this->invoice->amount)
+                    ->whereNull('invoice_id')
+                    ->where('status', 'approved')
+                    ->lockForUpdate()
+                    ->first();
 
-        if (! $transaction) {
+                if (! $transaction) {
+                    throw new \Exception('No matching transaction found. Please verify your transaction ID and try again.');
+                }
+
+                // Claim the transaction
+                $transaction->update([
+                    'invoice_id' => $this->invoice->id,
+                ]);
+
+                // Mark invoice as paid
+                $this->invoice->update([
+                    'status' => InvoiceStatus::PAID,
+                ]);
+            });
+
+            // Post webhook after successful transaction
+            $this->postWebhook();
+
+            // Show success notification
+            Notification::make()
+                ->success()
+                ->title('Payment Verified')
+                ->body('Your payment has been successfully verified!')
+                ->send();
+
+            // Redirect to success URL
+            $this->redirect($this->invoice->redirect_url);
+        } catch (\Exception $e) {
             Notification::make()
                 ->danger()
                 ->title('Transaction Not Found')
-                ->body('No matching transaction found. Please verify your transaction ID and try again.')
+                ->body($e->getMessage())
                 ->send();
 
             $this->isVerifying = false;
-
-            return;
         }
-
-        // Claim the transaction
-        $transaction->update([
-            'invoice_id' => $this->invoice->id,
-        ]);
-
-        // Mark invoice as paid
-        $this->invoice->update([
-            'status' => InvoiceStatus::PAID,
-        ]);
-
-        // Post webhook
-        $this->postWebhook();
-
-        // Show success notification
-        Notification::make()
-            ->success()
-            ->title('Payment Verified')
-            ->body('Your payment has been successfully verified!')
-            ->send();
-
-        // Redirect to success URL
-        $this->redirect($this->invoice->redirect_url);
     }
 
     protected function postWebhook(): void
@@ -126,7 +132,7 @@ class MakePayment extends SimplePage
             $response = Http::timeout(10)
                 ->acceptJson()
                 ->post($this->invoice->webhook_url, [
-                    'invoice_id' => $this->invoice->id,
+                    'invoice_id' => $this->invoice->invoice_id,
                     'ulid' => $this->invoice->ulid,
                     'amount' => $this->invoice->amount,
                     'currency' => $this->invoice->currency,

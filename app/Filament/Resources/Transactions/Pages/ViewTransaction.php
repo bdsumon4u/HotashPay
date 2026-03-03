@@ -4,9 +4,9 @@ namespace App\Filament\Resources\Transactions\Pages;
 
 use App\Filament\Resources\Transactions\TransactionResource;
 use Filament\Actions\DeleteAction;
-use Filament\Resources\Pages\EditRecord;
+use Filament\Resources\Pages\ViewRecord;
 
-class EditTransaction extends EditRecord
+class ViewTransaction extends ViewRecord
 {
     protected static string $resource = TransactionResource::class;
 

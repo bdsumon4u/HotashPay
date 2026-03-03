@@ -18,12 +18,12 @@ use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable implements HasAppAuthentication, HasAppAuthenticationRecovery, HasEmailAuthentication
 {
+    use HasApiTokens;
+
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, TwoFactorAuthenticatable;
-
     use InteractsWithAppAuthentication, InteractsWithAppAuthenticationRecovery;
     use InteractsWithEmailAuthentication;
-    use HasApiTokens;
 
     /**
      * The attributes that are mass assignable.
