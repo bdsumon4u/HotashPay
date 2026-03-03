@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Invoices\Tables;
 
+use App\Enums\InvoiceStatus;
+use App\Filament\Resources\Transactions\TransactionResource;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -16,6 +18,11 @@ class InvoicesTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn ($query) => $query->with([
+                'transaction' => function ($query) {
+                    $query->select('id', 'invoice_id', 'trxid');
+                },
+            ]))
             ->columns([
                 TextColumn::make('id')
                     ->label('ID')
@@ -43,6 +50,11 @@ class InvoicesTable
                     ->badge()
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('transaction.trxid')
+                    ->label('Transaction')
+                    ->searchable()
+                    ->url(fn ($record) => $record->transaction ? TransactionResource::getUrl('view', ['record' => $record->transaction]) : null)
+                    ->openUrlInNewTab(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -62,6 +74,7 @@ class InvoicesTable
                 Action::make('pay')
                     ->label('Pay')
                     ->icon('heroicon-o-credit-card')
+                    ->visible(fn ($record) => $record->status !== InvoiceStatus::PAID)
                     ->url(fn ($record) => route('invoices.pay', ['invoice' => $record]))
                     ->openUrlInNewTab(),
                 DeleteAction::make(),

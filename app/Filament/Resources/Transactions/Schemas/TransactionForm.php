@@ -21,7 +21,9 @@ class TransactionForm
     public static function configure(Schema $schema): Schema
     {
         return $schema
-            ->components(self::steps());
+            ->components(
+                self::parsedDataSchema(),
+            );
     }
 
     public static function receivedDataSchema(): array

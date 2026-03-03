@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Transactions\Tables;
 
+use App\Filament\Resources\Invoices\InvoiceResource;
 use App\Filament\Resources\Transactions\Schemas\TransactionForm;
 use App\Payment\PaymentManager;
 use Filament\Actions\BulkActionGroup;
@@ -37,6 +38,12 @@ class TransactionsTable
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('status')
                     ->searchable(),
+                TextColumn::make('invoice.invoice_id')
+                    ->label('Invoice')
+                    ->searchable()
+                    ->sortable()
+                    ->url(fn ($record) => $record->invoice_id ? InvoiceResource::getUrl('view', ['record' => $record->invoice_id]) : null)
+                    ->openUrlInNewTab(),
                 TextColumn::make('received_at')
                     ->dateTime()
                     ->sortable()
