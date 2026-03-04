@@ -39,8 +39,6 @@ class WebhookController extends Controller
         $userAgent = $request->header('User-Agent');
         info('user agent: '.$userAgent);
 
-        // $request->merge(json_decode('{"from":"bKash","text":"You have received payment Tk 500.00 from 01783110247. Fee Tk 0.00. Balance Tk 9,452.20. TrxID DAM6CTT7RW at 22/01/2026 01:54","sentStamp":1769025241000,"receivedStamp":1769025248417,"sim":"sim1"}', true));
-
         if ($userAgent === 'HT-HP-APP') {
             return $this->processSmsNotification($request);
         }
