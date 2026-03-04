@@ -32,7 +32,7 @@ class SmsParser
             'mobile' => $matches['mobile'] ?? '--',
             'trxid' => $matches['trxid'] ?? null,
             'balance' => (string) str_replace(',', '', $matches['balance'] ?? '0'),
-            'received_at' => self::parseDateTime($matches) ?? $receivedStamp,
+            'received_at' => self::parseDateTime($matches) ?? Carbon::parse($receivedStamp)->toDateTimeString(),
             'status' => $matches['status'] ?? 'review',
         ];
     }
