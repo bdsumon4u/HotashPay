@@ -17,6 +17,7 @@ class InvoiceFactory extends Factory
     public function definition(): array
     {
         return [
+            'invoice_id' => fake()->unique()->regexify('[A-Z]{3}[0-9]{7}'),
             'client_name' => fake()->name(),
             'client_email' => fake()->email(),
             'client_phone' => fake()->phoneNumber(),
