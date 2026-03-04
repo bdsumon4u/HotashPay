@@ -22,7 +22,7 @@ class CreateInvoiceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'invoice_id' => 'required|string|max:255|unique:invoices,invoice_id',
+            'invoice_id' => 'required|string|max:255',
             'client_name' => 'required|string|max:255',
             'client_email' => 'required_without:client_phone|email|max:255|nullable',
             'client_phone' => 'required_without:client_email|string|max:20|nullable',
