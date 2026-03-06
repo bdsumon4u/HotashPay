@@ -20,6 +20,7 @@ class Transaction extends Model
         'mobile',
         'trxid',
         'balance',
+        'received_at',
         'status',
     ];
 

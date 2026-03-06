@@ -8,6 +8,7 @@ use App\Models\Transaction;
 use App\Payment\SmsParser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class WebhookController extends Controller
 {
@@ -84,8 +85,8 @@ class WebhookController extends Controller
     {
         $from = $request->input('from', '');
         $text = $request->input('text', '');
-        $sentStamp = $request->input('sentStamp', '');
-        $receivedStamp = $request->input('receivedStamp', now()->toDateTimeString());
+        $receivedStamp = $this->normalizeReceivedStamp($request->input('receivedStamp', now()->toDateTimeString()));
+
         $sim = $this->normalizeSim($request->input('sim', 1));
 
         info('processing');
@@ -106,6 +107,15 @@ class WebhookController extends Controller
         info('after transaction');
 
         return response()->json(['status' => true, 'message' => 'SMS processed successfully']);
+    }
+
+    private function normalizeReceivedStamp(mixed $receivedStamp): string
+    {
+        if (is_numeric($receivedStamp)) {
+            return Carbon::createFromTimestampMs((int) $receivedStamp)->toDateTimeString();
+        }
+
+        return Carbon::parse((string) $receivedStamp)->toDateTimeString();
     }
 
     private function normalizeSim(int|string $sim): string
