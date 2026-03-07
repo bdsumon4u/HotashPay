@@ -37,6 +37,32 @@ test('webhook processes sms notification with milliseconds timestamp from bkash'
     ]);
 });
 
+test('webhook processes bkash merchant sms with ref field', function () {
+    $msTimestamp = 1772809460169;
+    $text = 'You have received payment Tk 600.00 from 01815252733. Ref SUREBAZAR. Fee Tk 0.00. Balance Tk 13,990.10. TrxID DC61R98YS5 at 06/03/2026 21:04';
+
+    $response = $this->post('/api/webhook', [
+        'from' => 'bKash',
+        'text' => $text,
+        'receivedStamp' => $msTimestamp,
+        'sim' => 1,
+    ], [
+        'User-Agent' => 'HT-HP-APP',
+    ]);
+
+    $response->assertSuccessful();
+    $response->assertJson(['status' => true, 'message' => 'SMS processed successfully']);
+
+    $this->assertDatabaseHas(Transaction::class, [
+        'provider' => 'bkash-merchant',
+        'amount' => '600.00',
+        'mobile' => '01815252733',
+        'trxid' => 'DC61R98YS5',
+        'balance' => '13990.10',
+        'status' => 'approved',
+    ]);
+});
+
 test('webhook returns 422 when sms cannot be parsed', function () {
     $msTimestamp = 1772809460169;
     $text = 'Invalid SMS format that does not match any provider';
