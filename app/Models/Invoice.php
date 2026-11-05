@@ -42,7 +42,7 @@ class Invoice extends Model
 
         $record = parent::resolveRouteBinding($value, $field);
 
-        throw_unless($record, (new ModelNotFoundException)->setModel(self::class, [$value]));
+        throw_unless($record, (new ModelNotFoundException)->setModel(self::class, [(string) $value]));
 
         return $record;
     }
@@ -52,6 +52,15 @@ class Invoice extends Model
         return Attribute::get(
             fn (): string => route('invoices.pay', ['invoice' => $this->ulid]),
         );
+    }
+
+    public function reference(): Attribute
+    {
+        return Attribute::get(function (): string {
+            $id = (string) $this->invoice_id;
+
+            return str_starts_with(strtoupper($id), 'HP') ? $id : 'HP'.$id;
+        });
     }
 
     public function redirectUrl(): Attribute

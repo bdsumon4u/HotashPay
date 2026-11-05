@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" width="100%" height="100%">
+    <defs>
+        <linearGradient id="cityRedGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#E51923"/>
+            <stop offset="100%" stop-color="#B20C15"/>
+        </linearGradient>
+    </defs>
+    <!-- Emblem (Checkered perspective diamond / cube) -->
+    <g transform="translate(10, 10)">
+        <!-- Top Left Facet -->
+        <polygon points="28,2 54,16 28,30 2,16" fill="#D71920" />
+        <polygon points="28,2 41,9 28,16 15,9" fill="#FFFFFF" opacity="0.9" />
+        <!-- Top Right check pattern -->
+        <polygon points="41,9 54,16 41,23 28,16" fill="#B20C15" />
+        <!-- Bottom Left Facet -->
+        <polygon points="2,16 28,30 28,60 2,46" fill="#C4161D" />
+        <polygon points="2,16 15,23 15,38 2,31" fill="#FFFFFF" opacity="0.95" />
+        <polygon points="15,38 28,45 28,60 15,53" fill="#D71920" />
+        <polygon points="15,23 28,30 28,45 15,38" fill="#980A11" />
+        <!-- Bottom Right Facet -->
+        <polygon points="28,30 54,16 54,46 28,60" fill="#E51923" />
+        <polygon points="28,30 41,23 41,38 28,45" fill="#FFFFFF" opacity="0.95" />
+        <polygon points="41,38 54,31 54,46 41,53" fill="#B20C15" />
+        <polygon points="41,23 54,16 54,31 41,38" fill="#D71920" />
+    </g>
+    <!-- Brand Typography -->
+    <text x="75" y="44" font-family="'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="30" font-weight="800" fill="#C4161D" letter-spacing="-0.5">city bank</text>
+    <text x="77" y="58" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" font-weight="600" fill="#64748B" letter-spacing="1.2">MAKING SENSE OF FINANCE</text>
+</svg>
+

@@ -13,7 +13,12 @@ class BkashMerchantDriver extends PaymentDriver
 
     public function getAliases(): array
     {
-        return ['bKash'];
+        return ['bKash', 'bkash', 'BKASH', 'বিকাশ', '01783018397'];
+    }
+
+    public function getReceiptPromptNotes(): ?string
+    {
+        return 'bKash Merchant TrxID is an alphanumeric 10-character code.';
     }
 
     public function getMessageFormats(): array
@@ -22,6 +27,4 @@ class BkashMerchantDriver extends PaymentDriver
             '/You have received payment Tk (?<amount>[\d,]+\.\d{2}) from (?<mobile>\d+)\.(?: Ref .*?\.)? Fee Tk (?<fee>[\d,]+\.\d{2})\. Balance Tk (?<balance>[\d,]+\.\d{2})\. TrxID (?<trxid>\w+) at (?<datetime>\d{2}\/\d{2}\/\d{4} \d{2}:\d{2})/',
         ];
     }
-
-    // Add payment processing methods here
 }

@@ -48,8 +48,12 @@ class TransactionForm
                 ->hiddenOn(Operation::Create),
             TextInput::make('mobile')
                 ->required(),
+            TextInput::make('sender_account')
+                ->label('Sender A/C'),
+            TextInput::make('receiver_account')
+                ->label('Receiver A/C'),
             TextInput::make('trxid')
-                ->label('Transaction ID'),
+                ->label('TrxID / Ref'),
             TextInput::make('amount')
                 ->numeric()
                 ->required(),

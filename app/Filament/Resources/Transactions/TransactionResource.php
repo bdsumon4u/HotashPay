@@ -19,6 +19,12 @@ class TransactionResource extends Resource
 {
     protected static ?string $model = Transaction::class;
 
+    protected static ?string $modelLabel = 'Incoming Sms';
+
+    protected static ?string $pluralModelLabel = 'Incoming Sms';
+
+    protected static ?string $navigationLabel = 'Incoming Sms';
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedDocumentCurrencyBangladeshi;
 
     public static function form(Schema $schema): Schema

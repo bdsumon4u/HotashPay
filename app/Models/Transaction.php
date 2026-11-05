@@ -18,6 +18,8 @@ class Transaction extends Model
         'provider',
         'amount',
         'mobile',
+        'sender_account',
+        'receiver_account',
         'trxid',
         'balance',
         'received_at',

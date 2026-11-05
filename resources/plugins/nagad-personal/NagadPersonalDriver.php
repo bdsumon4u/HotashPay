@@ -13,7 +13,12 @@ class NagadPersonalDriver extends PaymentDriver
 
     public function getAliases(): array
     {
-        return ['NAGAD', 'Nagad', '01708403334'];
+        return ['NAGAD', 'Nagad', 'nagad', 'নগদ', '01783110247', '01708403334'];
+    }
+
+    public function getReceiptPromptNotes(): ?string
+    {
+        return 'Nagad TxnID is an 8-character alphanumeric code.';
     }
 
     public function getMessageFormats(): array
@@ -22,6 +27,4 @@ class NagadPersonalDriver extends PaymentDriver
             '/Money Received\.\s*Amount: Tk (?<amount>[\d,]+\.\d{2})\s*Sender: (?<mobile>\d+)\s*Ref: (.+)\s*TxnID: (?<trxid>\w+)\s*Balance: Tk (?<balance>[\d,]+\.\d{2})\s*(?<date>\d{2}\/\d{2}\/\d{4}) (?<time>\d{2}:\d{2})/',
         ];
     }
-
-    // Add payment processing methods here
 }
