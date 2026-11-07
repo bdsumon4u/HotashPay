@@ -7,6 +7,10 @@ use App\Models\Transaction;
 use Illuminate\Support\Facades\Http;
 use Livewire\Livewire;
 
+beforeEach(function () {
+    config()->set('payment.gemini.api_key', config('payment.gemini.api_key') ?: 'test-fake-gemini-key');
+});
+
 it('verifies transaction and marks invoice as paid with database transaction', function () {
     Http::fake();
 
