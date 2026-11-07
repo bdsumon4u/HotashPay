@@ -8,7 +8,6 @@ use App\Models\Invoice;
 use App\Payment\PaymentManager;
 use App\Services\PaymentVerificationService;
 use Carbon\Carbon;
-use Filament\Notifications\Notification;
 use Filament\Pages\SimplePage;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
@@ -49,27 +48,6 @@ class MakePayment extends SimplePage
             $this->redirect($this->invoice->redirect_url);
 
             return;
-        }
-
-        $metadata = $this->invoice->metadata ?? [];
-        $status = $metadata['verification_status'] ?? null;
-
-        if ($status === 'processing') {
-            $startedAt = isset($metadata['verification_started_at'])
-                ? Carbon::parse($metadata['verification_started_at'])
-                : null;
-            $timeoutMinutes = (int) config('payment.timeout_minutes', 10);
-
-            if ($startedAt && $startedAt->diffInMinutes(now()) < $timeoutMinutes) {
-                $this->isVerifying = true;
-                $this->selectedProvider = $metadata['verification_provider'] ?? null;
-            } else {
-                $this->verificationFailed = true;
-                $this->verificationError = 'Verification timed out after 10 minutes. Please contact support.';
-            }
-        } elseif ($status === 'failed') {
-            $this->verificationFailed = true;
-            $this->verificationError = $metadata['verification_error'] ?? 'Payment verification failed. Please contact support.';
         }
 
         $this->gateways = [
@@ -138,12 +116,8 @@ class MakePayment extends SimplePage
 
         // Validate provider selection
         if (! $this->selectedProvider) {
-            Notification::make()
-                ->danger()
-                ->title('Payment Method Required')
-                ->body('Please select a payment method.')
-                ->send();
-
+            $this->verificationFailed = true;
+            $this->verificationError = 'Please select a payment method.';
             $this->isVerifying = false;
 
             return;
@@ -151,12 +125,8 @@ class MakePayment extends SimplePage
 
         // Validate Bank requirement: screenshot is required, no transaction ID
         if ($this->isBankPayment && ! $this->screenshot) {
-            Notification::make()
-                ->danger()
-                ->title('Screenshot Required')
-                ->body('Please upload your bank transfer receipt or confirmation screenshot.')
-                ->send();
-
+            $this->verificationFailed = true;
+            $this->verificationError = 'Please upload your bank transfer receipt or confirmation screenshot.';
             $this->isVerifying = false;
 
             return;
@@ -164,12 +134,8 @@ class MakePayment extends SimplePage
 
         // Validate MFS requirement: either transaction ID or screenshot is required
         if (! $this->isBankPayment && ! $this->transactionId && ! $this->screenshot) {
-            Notification::make()
-                ->danger()
-                ->title('Verification Detail Required')
-                ->body('Please enter your Transaction ID or upload a payment screenshot.')
-                ->send();
-
+            $this->verificationFailed = true;
+            $this->verificationError = 'Please enter your Transaction ID or upload a payment screenshot.';
             $this->isVerifying = false;
 
             return;
@@ -180,34 +146,20 @@ class MakePayment extends SimplePage
             $matched = $verifier->findMatchingTransactionByTrxId($this->invoice, $this->selectedProvider, $this->transactionId);
 
             if (! $matched) {
-                Notification::make()
-                    ->danger()
-                    ->title('Transaction Not Found')
-                    ->body("No matching transaction was found for Transaction ID '{$this->transactionId}'. Please verify the ID or wait 1-2 minutes if you just transferred.")
-                    ->send();
-
+                $this->verificationFailed = true;
+                $this->verificationError = "No matching transaction was found for Transaction ID '{$this->transactionId}'. Please verify the ID or wait 1-2 minutes if you just transferred.";
                 $this->isVerifying = false;
 
                 return;
             }
 
             if (! $verifier->claimTransaction($this->invoice, $matched)) {
-                Notification::make()
-                    ->danger()
-                    ->title('Already Claimed')
-                    ->body('This transaction has already been claimed by another invoice.')
-                    ->send();
-
+                $this->verificationFailed = true;
+                $this->verificationError = 'This transaction has already been claimed by another invoice.';
                 $this->isVerifying = false;
 
                 return;
             }
-
-            Notification::make()
-                ->success()
-                ->title('Payment Verified')
-                ->body('Your payment has been successfully verified!')
-                ->send();
 
             $this->redirect($this->invoice->redirect_url);
 
@@ -221,12 +173,8 @@ class MakePayment extends SimplePage
 
         $stored = $this->screenshot->store('screenshots', 'public');
         if ($stored === false) {
-            Notification::make()
-                ->danger()
-                ->title('Upload Failed')
-                ->body('Failed to save the uploaded screenshot. Please try again.')
-                ->send();
-
+            $this->verificationFailed = true;
+            $this->verificationError = 'Failed to save the uploaded screenshot. Please try again.';
             $this->isVerifying = false;
 
             return;
@@ -237,6 +185,12 @@ class MakePayment extends SimplePage
         $metadata['verification_started_at'] = now()->toIso8601String();
         $metadata['verification_screenshot'] = $stored;
         $metadata['verification_provider'] = $this->selectedProvider;
+        unset(
+            $metadata['verification_ai'],
+            $metadata['verification_cached_screenshot'],
+            $metadata['verification_last_candidates'],
+            $metadata['verification_error']
+        );
         if ($this->transactionId) {
             $metadata['verification_user_trxid'] = $this->transactionId;
         }
@@ -256,12 +210,6 @@ class MakePayment extends SimplePage
         $this->invoice->refresh();
 
         if ($this->invoice->status === InvoiceStatus::PAID) {
-            Notification::make()
-                ->success()
-                ->title('Payment Verified')
-                ->body('Your payment has been successfully verified!')
-                ->send();
-
             $this->redirect($this->invoice->redirect_url);
 
             return;
@@ -272,20 +220,8 @@ class MakePayment extends SimplePage
             $this->verificationFailed = true;
             $this->verificationError = $this->invoice->metadata['verification_error'] ?? 'Payment verification failed.';
 
-            Notification::make()
-                ->danger()
-                ->title('Verification Failed')
-                ->body($this->verificationError)
-                ->send();
-
             return;
         }
-
-        Notification::make()
-            ->info()
-            ->title('Verification in Progress')
-            ->body('Your payment receipt was uploaded. Our AI is verifying it against bank confirmation SMS.')
-            ->send();
     }
 
     public function checkVerificationStatus(): void
@@ -294,12 +230,6 @@ class MakePayment extends SimplePage
 
         if ($this->invoice->status === InvoiceStatus::PAID) {
             $this->isVerifying = false;
-            Notification::make()
-                ->success()
-                ->title('Payment Verified!')
-                ->body('Your payment has been successfully confirmed.')
-                ->send();
-
             $this->redirect($this->invoice->redirect_url);
 
             return;
@@ -312,12 +242,6 @@ class MakePayment extends SimplePage
             $this->isVerifying = false;
             $this->verificationFailed = true;
             $this->verificationError = $metadata['verification_error'] ?? 'Payment verification failed. Please contact support.';
-
-            Notification::make()
-                ->danger()
-                ->title('Verification Incomplete')
-                ->body($this->verificationError)
-                ->send();
 
             return;
         }
@@ -336,13 +260,29 @@ class MakePayment extends SimplePage
             $metadata['verification_status'] = 'failed';
             $metadata['verification_error'] = $this->verificationError;
             $this->invoice->update(['metadata' => $metadata]);
-
-            Notification::make()
-                ->danger()
-                ->title('Verification Timed Out')
-                ->body($this->verificationError)
-                ->send();
         }
+    }
+
+    public function cancelVerification(): void
+    {
+        $this->isVerifying = false;
+        $this->verificationFailed = false;
+        $this->verificationError = null;
+        $this->screenshot = null;
+        $this->transactionId = null;
+
+        $metadata = $this->invoice->metadata ?? [];
+        $metadata['verification_status'] = 'cancelled';
+        unset(
+            $metadata['verification_ai'],
+            $metadata['verification_cached_screenshot'],
+            $metadata['verification_last_candidates'],
+            $metadata['verification_error']
+        );
+
+        $this->invoice->update([
+            'metadata' => $metadata,
+        ]);
     }
 
     public function resetVerification(): void
@@ -354,7 +294,14 @@ class MakePayment extends SimplePage
         $this->transactionId = null;
 
         $metadata = $this->invoice->metadata ?? [];
-        unset($metadata['verification_status'], $metadata['verification_error'], $metadata['verification_started_at']);
+        unset(
+            $metadata['verification_status'],
+            $metadata['verification_error'],
+            $metadata['verification_started_at'],
+            $metadata['verification_ai'],
+            $metadata['verification_cached_screenshot'],
+            $metadata['verification_last_candidates']
+        );
 
         $this->invoice->update([
             'metadata' => $metadata,

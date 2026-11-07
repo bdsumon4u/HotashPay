@@ -13,7 +13,7 @@ class BkashPersonalDriver extends PaymentDriver
 
     public function getAliases(): array
     {
-        return ['bKash', 'bkash', 'BKASH', 'বিকাশ', '01624093099'];
+        return ['bKash', 'bkash', 'BKASH', 'বিকাশ'];
     }
 
     public function getReceiptPromptNotes(): ?string

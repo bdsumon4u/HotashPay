@@ -156,4 +156,22 @@ test('sms parser extracts receiver and sender accounts from bank and mfs sms', f
     expect($bkashParsed)->not->toBeNull()
         ->and($bkashParsed['sender_account'])->toBe('01815252733')
         ->and($bkashParsed['trxid'])->toBe('DC61R98YS5');
+
+    // 6. EBL Real Sample
+    $eblSample = 'AC 118***551 is credited with BDT 40000 as NPSB FUND TRANSFER on 07-NOV-26 12:11:06 AM Balance is BDT 40226.66 Thanks. EBL Helpline 16230';
+    $eblSampleParsed = \App\Payment\SmsParser::parse('EBL', $eblSample, now()->toDateTimeString());
+    expect($eblSampleParsed)->not->toBeNull()
+        ->and($eblSampleParsed['provider'])->toBe('bank-ebl')
+        ->and($eblSampleParsed['receiver_account'])->toBe('118***551')
+        ->and($eblSampleParsed['amount'])->toBe('40000')
+        ->and($eblSampleParsed['balance'])->toBe('40226.66');
+
+    // 7. City Bank Real Sample
+    $citySample = "05-Nov-2026\nTk. 7,000 Deposit\nTk. 14,092 Balance\nA/C: 2304***1001";
+    $citySampleParsed = \App\Payment\SmsParser::parse('CITY BANK', $citySample, now()->toDateTimeString());
+    expect($citySampleParsed)->not->toBeNull()
+        ->and($citySampleParsed['provider'])->toBe('bank-city')
+        ->and($citySampleParsed['receiver_account'])->toBe('2304***1001')
+        ->and($citySampleParsed['amount'])->toBe('7000')
+        ->and($citySampleParsed['balance'])->toBe('14092');
 });

@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
+use App\Payment\PaymentManager;
 use App\Services\GeminiVisionService;
 use App\Services\PaymentVerificationService;
 use Carbon\Carbon;
@@ -34,9 +35,17 @@ class VerifyPaymentJob implements ShouldQueue
     public function handle(
         GeminiVisionService $geminiVision,
         PaymentVerificationService $verifier,
+        ?PaymentManager $paymentManager = null,
     ): void {
+        $paymentManager ??= app(PaymentManager::class);
+        $paymentProvider = $paymentManager->findProvider($this->provider);
+
         $invoice = Invoice::query()->find($this->invoiceId);
         if (! $invoice || $invoice->status === InvoiceStatus::PAID) {
+            return;
+        }
+
+        if (($invoice->metadata['verification_status'] ?? null) === 'cancelled') {
             return;
         }
 
@@ -55,23 +64,133 @@ class VerifyPaymentJob implements ShouldQueue
             return;
         }
 
-        // 1. Fetch unclaimed candidate transactions from incoming SMS
-        $candidates = $verifier->getUnclaimedCandidates($invoice, $this->provider);
+        // Fast-path 1: Check instant match by user-submitted Transaction ID if provided
+        if (! empty($this->transactionId)) {
+            $matchedByTrx = $verifier->findMatchingTransactionByTrxId(
+                $invoice,
+                $paymentProvider ?? $this->provider,
+                $this->transactionId
+            );
 
-        // 2. Reconcile screenshot against candidate transactions via Gemini AI
+            if ($matchedByTrx) {
+                $verifier->claimTransaction($invoice, $matchedByTrx, [
+                    'verification_status' => 'completed',
+                    'verification_confidence' => 1.0,
+                    'verification_reason' => "Exact match for user-submitted Transaction ID '{$this->transactionId}'",
+                ]);
+
+                return;
+            }
+        }
+
+        // 1. Fetch unclaimed candidate transactions from incoming SMS
+        $candidates = $verifier->getUnclaimedCandidates($invoice, $paymentProvider ?? $this->provider);
+
+        // 2. Resolve and cache screenshot OCR data (tied to specific screenshotPath)
+        $cachedScreenshot = $invoice->metadata['verification_cached_screenshot'] ?? null;
+        $cachedAi = ($cachedScreenshot === $this->screenshotPath) ? ($invoice->metadata['verification_ai'] ?? null) : null;
+
+        if (! is_array($cachedAi) || empty($cachedAi)) {
+            $extracted = $geminiVision->analyzeScreenshot($this->screenshotPath);
+            $metadata = $invoice->metadata ?? [];
+            $metadata['verification_ai'] = $extracted;
+            $metadata['verification_cached_screenshot'] = $this->screenshotPath;
+            unset($metadata['verification_last_candidates']); // New screenshot -> reset candidate evaluation history
+            $invoice->update(['metadata' => $metadata]);
+        } else {
+            $extracted = $cachedAi;
+        }
+
+        // Flag suspicious or edited screenshots immediately
+        if (! empty($extracted['is_suspicious_or_edited'])) {
+            $metadata = $invoice->metadata ?? [];
+            $metadata['verification_status'] = 'failed';
+            $metadata['verification_error'] = 'The uploaded receipt appears to be edited or suspicious. Please upload an unaltered receipt.';
+            $metadata['verification_ai'] = $extracted;
+            $invoice->update(['metadata' => $metadata]);
+
+            return;
+        }
+
+        // Fast-path 2: If screenshot contained an exact TrxID, check instant match against DB
+        $extractedTrxId = ! empty($extracted['trx_id']) ? (string) $extracted['trx_id'] : null;
+        if ($extractedTrxId !== null) {
+            $matchedByExtractedTrx = $verifier->findMatchingTransactionByTrxId(
+                $invoice,
+                $paymentProvider ?? $this->provider,
+                $extractedTrxId
+            );
+
+            if ($matchedByExtractedTrx) {
+                $verifier->claimTransaction($invoice, $matchedByExtractedTrx, [
+                    'verification_status' => 'completed',
+                    'verification_confidence' => 0.99,
+                    'verification_reason' => "Exact match for extracted TrxID '{$extractedTrxId}' from receipt",
+                    'verification_ai' => $extracted,
+                ]);
+
+                return;
+            }
+        }
+
+        // 3. If no candidate transactions exist yet, release back to queue without burning AI tokens
+        if ($candidates->isEmpty()) {
+            if ($startedAt && $startedAt->diffInMinutes(now()) < $timeoutMinutes) {
+                $this->release(20);
+
+                return;
+            }
+
+            $metadata = $invoice->metadata ?? [];
+            $metadata['verification_status'] = 'failed';
+            $metadata['verification_error'] = 'Could not match payment confirmation within 10 minutes. Please contact support.';
+            $invoice->update(['metadata' => $metadata]);
+
+            return;
+        }
+
+        // 4. Candidate signature check: Avoid re-running Gemini if the candidates haven't changed
+        $candidateIds = $candidates->pluck('id')->sort()->values()->all();
+        $candidateSignature = implode(',', $candidateIds);
+        $lastEvaluatedSignature = $invoice->metadata['verification_last_candidates'] ?? null;
+
+        if ($lastEvaluatedSignature === $candidateSignature) {
+            // Unclaimed candidates remain the same as last evaluation.
+            // Release and wait for new incoming SMS without burning AI tokens.
+            if ($startedAt && $startedAt->diffInMinutes(now()) < $timeoutMinutes) {
+                $this->release(20);
+
+                return;
+            }
+
+            $metadata = $invoice->metadata ?? [];
+            $metadata['verification_status'] = 'failed';
+            $metadata['verification_error'] = 'Could not match payment confirmation within 10 minutes. Please contact support.';
+            $invoice->update(['metadata' => $metadata]);
+
+            return;
+        }
+
+        // 5. Reconcile screenshot against candidate transactions via Gemini AI
         $matchResult = $geminiVision->matchScreenshotWithCandidateTransactions(
             screenshotPath: $this->screenshotPath,
             invoice: $invoice,
             candidateTransactions: $candidates->all(),
-            provider: $this->provider,
+            provider: $paymentProvider,
+            extractedData: $extracted,
         );
 
-        // Flag suspicious or edited screenshots immediately
+        // Record the signature of the candidates we just evaluated to prevent duplicate runs
+        $metadata = $invoice->metadata ?? [];
+        $metadata['verification_last_candidates'] = $candidateSignature;
+        $invoice->update(['metadata' => $metadata]);
+
+        // Flag suspicious or edited screenshots if flagged during reconciliation
         if (! empty($matchResult['is_suspicious_or_edited'])) {
             $metadata = $invoice->metadata ?? [];
             $metadata['verification_status'] = 'failed';
             $metadata['verification_error'] = 'The uploaded receipt appears to be edited or suspicious. Please upload an unaltered receipt.';
-            $metadata['verification_ai'] = $matchResult['extracted_data'] ?? [];
+            $metadata['verification_ai'] = $matchResult['extracted_data'] ?? $extracted;
             $invoice->update(['metadata' => $metadata]);
 
             return;
@@ -88,7 +207,7 @@ class VerifyPaymentJob implements ShouldQueue
                     'verification_status' => 'completed',
                     'verification_confidence' => $confidence,
                     'verification_reason' => $matchResult['match_reason'] ?? null,
-                    'verification_ai' => $matchResult['extracted_data'] ?? [],
+                    'verification_ai' => $matchResult['extracted_data'] ?? $extracted,
                 ]);
 
                 return;

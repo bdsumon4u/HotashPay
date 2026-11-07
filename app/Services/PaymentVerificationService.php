@@ -25,15 +25,15 @@ class PaymentVerificationService
      */
     public function findMatchingTransactionByTrxId(
         Invoice $invoice,
-        PaymentProvider|string $provider,
+        PaymentProvider|string|null $provider,
         string $trxId,
     ): ?Transaction {
         $windowMinutes = (int) config('payment.window_time_minutes', 60);
-        $providerVariants = $this->resolveProviderVariants($provider);
+        $providerKey = $this->paymentManager->getDriverKey($provider);
         $cleanTrxId = strtoupper(trim($trxId));
 
         return Transaction::query()
-            ->whereIn('provider', $providerVariants)
+            ->where('provider', $providerKey)
             ->where('amount', $invoice->amount)
             ->whereNull('invoice_id')
             ->where(function ($q) use ($cleanTrxId) {
@@ -43,10 +43,7 @@ class PaymentVerificationService
             ->where(function ($q) use ($windowMinutes) {
                 $cutoff = now()->subMinutes($windowMinutes);
                 $q->where('received_at', '>=', $cutoff)
-                    ->orWhere(function ($sub) use ($cutoff) {
-                        $sub->whereNull('received_at')
-                            ->where('created_at', '>=', $cutoff);
-                    });
+                    ->orWhere('created_at', '>=', $cutoff);
             })
             ->lockForUpdate()
             ->first();
@@ -59,14 +56,14 @@ class PaymentVerificationService
      */
     public function getUnclaimedCandidates(
         Invoice $invoice,
-        PaymentProvider|string $provider,
+        PaymentProvider|string|null $provider = null,
         int $limit = 10,
     ): Collection {
         $windowMinutes = (int) config('payment.window_time_minutes', 60);
-        $providerVariants = $this->resolveProviderVariants($provider);
+        $providerKey = $this->paymentManager->getDriverKey($provider);
 
         return Transaction::query()
-            ->whereIn('provider', $providerVariants)
+            ->where('provider', $providerKey)
             ->whereNull('invoice_id')
             ->where(function ($query) use ($invoice) {
                 $query->where('amount', $invoice->amount)
@@ -75,10 +72,7 @@ class PaymentVerificationService
             ->where(function ($query) use ($windowMinutes) {
                 $cutoff = now()->subMinutes($windowMinutes);
                 $query->where('received_at', '>=', $cutoff)
-                    ->orWhere(function ($sub) use ($cutoff) {
-                        $sub->whereNull('received_at')
-                            ->where('created_at', '>=', $cutoff);
-                    });
+                    ->orWhere('created_at', '>=', $cutoff);
             })
             ->orderByDesc('id')
             ->limit($limit)
@@ -166,25 +160,6 @@ class PaymentVerificationService
     }
 
     /**
-     * Resolves all provider aliases dynamically via PaymentManager.
-     *
-     * @return array<string>
-     */
-    public function resolveProviderVariants(
-        PaymentProvider|string $provider,
-        PaymentProvider|string|null $extractedProvider = null,
-    ): array {
-        $providers = array_filter([$provider, $extractedProvider]);
-        $variants = [];
-
-        foreach ($providers as $p) {
-            $variants = array_merge($variants, $this->paymentManager->getProviderVariants($p));
-        }
-
-        return array_values(array_unique(array_filter($variants)));
-    }
-
-    /**
      * Verify an invoice against a transaction ID or screenshot (used by sync callers and feature tests).
      *
      * @return array{
@@ -222,7 +197,7 @@ class PaymentVerificationService
                 screenshotPath: $screenshotPath,
                 invoice: $invoice,
                 candidateTransactions: $candidates->all(),
-                provider: $resolvedProvider ?? $provider,
+                provider: $resolvedProvider,
             );
 
             if (! empty($aiResult['is_suspicious_or_edited'])) {

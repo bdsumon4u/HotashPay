@@ -3,7 +3,7 @@
     <div class="hp-table-row flex items-center justify-between px-3 py-2">
         <span class="hp-label text-slate-500 dark:text-slate-400 font-medium">Bank</span>
         <span class="hp-value font-semibold text-slate-900 dark:text-white text-right">
-            City Bank Ltd
+            City Bank PLC
         </span>
     </div>
 
@@ -11,8 +11,8 @@
     <div class="hp-table-row flex items-center justify-between px-3 py-2 gap-2">
         <span class="hp-label text-slate-500 dark:text-slate-400 font-medium shrink-0">Branch</span>
         <div class="flex items-center gap-1.5" x-data="{ copied: false }">
-            <span class="font-medium text-slate-900 dark:text-white text-xs">Patharghata Rd Branch</span>
-            <button type="button" @click="copyToClipboard('Patharghata Rd Branch'); copied = true; setTimeout(() => copied = false, 2000)"
+            <span class="font-medium text-slate-900 dark:text-white text-xs">Rokeya Sarani Branch</span>
+            <button type="button" @click="copyToClipboard('Rokeya Sarani Branch'); copied = true; setTimeout(() => copied = false, 2000)"
                 :class="copied ? 'bg-emerald-700' : 'bg-emerald-600 hover:bg-emerald-500'"
                 class="hp-copy-btn inline-flex items-center gap-1 px-2 py-1 rounded-md active:scale-95 text-white font-medium text-[11px] transition shadow-xs cursor-pointer">
                 <template x-if="!copied">
@@ -34,8 +34,8 @@
     <div class="hp-table-row flex items-center justify-between px-3 py-2 gap-2">
         <span class="hp-label text-slate-500 dark:text-slate-400 font-medium shrink-0">Account Number</span>
         <div class="flex items-center gap-1.5" x-data="{ copied: false }">
-            <code class="hp-code font-mono font-bold text-slate-900 dark:text-white tracking-wider text-xs bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700">1181000060051</code>
-            <button type="button" @click="copyToClipboard('1181000060051'); copied = true; setTimeout(() => copied = false, 2000)"
+            <code class="hp-code font-mono font-bold text-slate-900 dark:text-white tracking-wider text-xs bg-white dark:bg-slate-900 px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700">2304878931001</code>
+            <button type="button" @click="copyToClipboard('2304878931001'); copied = true; setTimeout(() => copied = false, 2000)"
                 :class="copied ? 'bg-emerald-700' : 'bg-emerald-600 hover:bg-emerald-500'"
                 class="hp-copy-btn inline-flex items-center gap-1 px-2 py-1 rounded-md active:scale-95 text-white font-medium text-[11px] transition shadow-xs cursor-pointer">
                 <template x-if="!copied">
@@ -57,8 +57,8 @@
     <div class="hp-table-row flex items-center justify-between px-3 py-2 gap-2">
         <span class="hp-label text-slate-500 dark:text-slate-400 font-medium shrink-0">Account Name</span>
         <div class="flex items-center gap-1.5" x-data="{ copied: false }">
-            <span class="font-semibold text-slate-900 dark:text-white text-xs">Foysal Amir</span>
-            <button type="button" @click="copyToClipboard('Foysal Amir'); copied = true; setTimeout(() => copied = false, 2000)"
+            <span class="font-semibold text-slate-900 dark:text-white text-xs">Sumon Ahmed</span>
+            <button type="button" @click="copyToClipboard('Sumon Ahmed'); copied = true; setTimeout(() => copied = false, 2000)"
                 :class="copied ? 'bg-emerald-700' : 'bg-emerald-600 hover:bg-emerald-500'"
                 class="hp-copy-btn inline-flex items-center gap-1 px-2 py-1 rounded-md active:scale-95 text-white font-medium text-[11px] transition shadow-xs cursor-pointer">
                 <template x-if="!copied">

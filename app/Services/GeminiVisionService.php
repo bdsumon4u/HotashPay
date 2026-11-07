@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\Invoice;
+use App\Models\Transaction;
 use App\Payment\PaymentManager;
 use App\Payment\PaymentProvider;
 use Exception;
@@ -477,9 +479,10 @@ PROMPT;
         string $screenshotPath,
         \App\Models\Invoice $invoice,
         array $candidateTransactions,
-        \App\Payment\PaymentProvider|string|null $provider = null,
+        ?PaymentProvider $provider = null,
+        ?array $extractedData = null,
     ): array {
-        $extracted = $this->analyzeScreenshot($screenshotPath);
+        $extracted = $extractedData ?? $this->analyzeScreenshot($screenshotPath);
 
         if (! empty($extracted['is_suspicious_or_edited'])) {
             return [
@@ -501,142 +504,240 @@ PROMPT;
             ];
         }
 
-        $extTrxId = ! empty($extracted['trx_id']) ? strtoupper(trim((string) $extracted['trx_id'])) : null;
-        $extRef = ! empty($extracted['reference']) ? strtoupper(trim((string) $extracted['reference'])) : null;
-        $extAmount = isset($extracted['amount']) && is_numeric($extracted['amount'])
-            ? (float) $extracted['amount']
-            : (float) $invoice->amount;
-        $extReceiverAcc = $extracted['receiver_account'] ?? null;
-        $extSenderAcc = $extracted['sender_account'] ?? null;
-        $extTime = $extracted['transaction_time'] ?? null;
+        return $this->reconcileCandidatesWithGemini(
+            screenshotData: $extracted,
+            candidateTransactions: $candidateTransactions,
+            invoice: $invoice,
+            provider: $provider,
+        );
+    }
 
-        $bestCandidate = null;
-        $bestScore = 0.0;
-        $bestReason = 'No matching candidate found';
+    /**
+     * Call Gemini model to reconcile screenshot data and candidate transactions,
+     * returning the highest-confidence matched transaction ID and score.
+     *
+     * @param  array<string, mixed>  $screenshotData
+     * @param  array<int, Transaction>  $candidateTransactions
+     * @return array{
+     *     matched_transaction_id: ?int,
+     *     confidence_score: float,
+     *     match_reason: string,
+     *     is_suspicious_or_edited: bool,
+     *     extracted_data: array<string, mixed>
+     * }
+     */
+    public function reconcileCandidatesWithGemini(
+        array $screenshotData,
+        array $candidateTransactions,
+        Invoice $invoice,
+        ?PaymentProvider $provider = null,
+    ): array {
+        $apiKey = config('payment.gemini.api_key');
+        $model = config('payment.gemini.model', 'gemini-flash-lite-latest');
+        $baseUrl = config('payment.gemini.base_url', 'https://generativelanguage.googleapis.com/v1beta');
 
-        foreach ($candidateTransactions as $tx) {
-            $score = 0.0;
-            $reasons = [];
+        if (empty($apiKey)) {
+            Log::warning('GEMINI_API_KEY is not configured in .env. Skipping automated AI candidate reconciliation.');
 
-            // Amount check (mandatory)
-            $txAmount = (float) $tx->amount;
-            $amountDiff = abs($txAmount - $extAmount);
-            $invoiceDiff = abs($txAmount - (float) $invoice->amount);
-
-            if ($amountDiff > 1.0 && $invoiceDiff > 1.0) {
-                continue;
-            }
-
-            $score += 0.35;
-            $reasons[] = "Amount matches BDT {$txAmount}";
-
-            // TrxID / Ref match
-            $matchedTrx = false;
-            if ($extTrxId !== null) {
-                if (! empty($tx->trxid) && strtoupper(trim((string) $tx->trxid)) === $extTrxId) {
-                    $score += 0.55;
-                    $reasons[] = "TrxID {$extTrxId} exact match";
-                    $matchedTrx = true;
-                } elseif (str_contains(strtoupper((string) $tx->message), $extTrxId)) {
-                    $score += 0.50;
-                    $reasons[] = "TrxID {$extTrxId} found in SMS";
-                    $matchedTrx = true;
-                }
-            }
-
-            if (! $matchedTrx && $extRef !== null) {
-                if (! empty($tx->trxid) && str_contains(strtoupper((string) $tx->trxid), $extRef)) {
-                    $score += 0.45;
-                    $reasons[] = "Reference {$extRef} matches";
-                } elseif (str_contains(strtoupper((string) $tx->message), $extRef)) {
-                    $score += 0.45;
-                    $reasons[] = "Reference {$extRef} found in SMS";
-                }
-            }
-
-            // Account overlap match
-            if ($extReceiverAcc && $this->accountMatches($extReceiverAcc, (string) ($tx->receiver_account ?? $tx->message))) {
-                $score += 0.25;
-                $reasons[] = 'Receiver account matches';
-            }
-
-            if ($extSenderAcc && $this->accountMatches($extSenderAcc, (string) ($tx->sender_account ?? $tx->message))) {
-                $score += 0.25;
-                $reasons[] = 'Sender account matches';
-            }
-
-            // Time proximity match
-            if ($extTime) {
-                try {
-                    $carbonExt = \Carbon\Carbon::parse($extTime);
-                    $carbonTx = $this->resolveTransactionTime($tx);
-                    if ($carbonTx && $carbonTx->isSameDay($carbonExt) && abs($carbonTx->diffInMinutes($carbonExt)) <= 30) {
-                        $score += 0.15;
-                        $reasons[] = "Time within 30 minutes of SMS ({$carbonTx->format('H:i')})";
-                    }
-                } catch (\Throwable) {
-                }
-            }
-
-            // If single candidate for provider with exact amount
-            if (count($candidateTransactions) === 1) {
-                $score += 0.15;
-                $reasons[] = 'Single candidate for exact amount';
-            }
-
-            $finalScore = min(1.0, round($score, 2));
-
-            if ($finalScore > $bestScore) {
-                $bestScore = $finalScore;
-                $bestCandidate = $tx;
-                $bestReason = implode('; ', $reasons);
-            }
+            return [
+                'matched_transaction_id' => null,
+                'confidence_score' => 0.0,
+                'match_reason' => 'Gemini API key is not configured.',
+                'is_suspicious_or_edited' => false,
+                'extracted_data' => $screenshotData,
+            ];
         }
 
-        $threshold = (float) config('payment.confidence_threshold', 0.85);
+        $candidatesPayload = array_values(array_map(function (Transaction $tx): array {
+            return [
+                'id' => $tx->id,
+                'provider' => $tx->provider,
+                'amount' => (float) $tx->amount,
+                'trxid' => $tx->trxid,
+                'sender_account' => $tx->sender_account,
+                'receiver_account' => $tx->receiver_account,
+                'received_at' => $tx->received_at ? (string) $tx->received_at : null,
+                'created_at' => $tx->created_at ? (string) $tx->created_at : null,
+                'message' => $tx->message,
+            ];
+        }, $candidateTransactions));
 
-        return [
-            'matched_transaction_id' => ($bestCandidate && $bestScore >= $threshold) ? $bestCandidate->id : null,
-            'confidence_score' => $bestScore,
-            'match_reason' => $bestReason,
-            'is_suspicious_or_edited' => false,
-            'extracted_data' => $extracted,
+        $prompt = $this->buildCandidateReconciliationPrompt(
+            screenshotData: $screenshotData,
+            candidates: $candidatesPayload,
+            invoice: $invoice,
+            provider: $provider,
+        );
+
+        try {
+            $endpoint = "{$baseUrl}/models/{$model}:generateContent";
+
+            $response = Http::withHeader('x-goog-api-key', $apiKey)
+                ->connectTimeout(10)
+                ->timeout(30)
+                ->retry(2, 500, null, false)
+                ->post($endpoint, [
+                    'contents' => [
+                        [
+                            'parts' => [
+                                ['text' => $prompt],
+                            ],
+                        ],
+                    ],
+                    'generationConfig' => [
+                        'response_mime_type' => 'application/json',
+                        'temperature' => 0.1,
+                        'max_output_tokens' => 1024,
+                    ],
+                ]);
+
+            if (! $response->successful()) {
+                Log::error('Gemini candidate reconciliation API call failed', [
+                    'status' => $response->status(),
+                ]);
+
+                return [
+                    'matched_transaction_id' => null,
+                    'confidence_score' => 0.0,
+                    'match_reason' => 'Gemini API returned HTTP '.$response->status().'.',
+                    'is_suspicious_or_edited' => false,
+                    'extracted_data' => $screenshotData,
+                ];
+            }
+
+            $responseData = $response->json();
+            $rawText = $responseData['candidates'][0]['content']['parts'][0]['text'] ?? '';
+            $decoded = json_decode($rawText, true);
+
+            if (! is_array($decoded)) {
+                Log::error('Failed to decode Gemini candidate reconciliation JSON', ['raw_text' => $rawText]);
+
+                return [
+                    'matched_transaction_id' => null,
+                    'confidence_score' => 0.0,
+                    'match_reason' => 'Invalid JSON returned by Gemini candidate reconciliation.',
+                    'is_suspicious_or_edited' => false,
+                    'extracted_data' => $screenshotData,
+                ];
+            }
+
+            $isSuspicious = (bool) ($decoded['is_suspicious_or_edited'] ?? false);
+            $rawMatchedId = $decoded['matched_transaction_id'] ?? $decoded['transaction_id'] ?? null;
+            $confidenceScore = isset($decoded['confidence_score']) ? (float) $decoded['confidence_score'] : 0.0;
+            $confidenceScore = max(0.0, min(1.0, round($confidenceScore, 2)));
+            $matchReason = (string) ($decoded['match_reason'] ?? $decoded['reason'] ?? 'No explanation provided.');
+
+            // Validate that the matched transaction ID genuinely exists in the candidate list
+            $validCandidateIds = array_column($candidatesPayload, 'id');
+            $matchedTxId = null;
+
+            if ($rawMatchedId !== null && in_array((int) $rawMatchedId, $validCandidateIds, true)) {
+                $matchedTxId = (int) $rawMatchedId;
+            }
+
+            $threshold = (float) config('payment.confidence_threshold', 0.85);
+
+            return [
+                'matched_transaction_id' => ($matchedTxId !== null && $confidenceScore >= $threshold && ! $isSuspicious) ? $matchedTxId : null,
+                'confidence_score' => $confidenceScore,
+                'match_reason' => $matchReason,
+                'is_suspicious_or_edited' => $isSuspicious,
+                'extracted_data' => $screenshotData,
+            ];
+        } catch (\Throwable $e) {
+            Log::error('Gemini candidate reconciliation exception', [
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
+
+            return [
+                'matched_transaction_id' => null,
+                'confidence_score' => 0.0,
+                'match_reason' => 'Gemini candidate reconciliation request failed before a response was received.',
+                'is_suspicious_or_edited' => false,
+                'extracted_data' => $screenshotData,
+            ];
+        }
+    }
+
+    /**
+     * Build the prompt for Gemini to reconcile screenshot data with candidate transactions.
+     *
+     * @param  array<string, mixed>  $screenshotData
+     * @param  array<int, array<string, mixed>>  $candidates
+     */
+    public function buildCandidateReconciliationPrompt(
+        array $screenshotData,
+        array $candidates,
+        Invoice $invoice,
+        ?PaymentProvider $provider = null,
+    ): string {
+        $rawProvider = $screenshotData['provider'] ?? null;
+        $sanitizedScreenshot = [
+            'provider' => $rawProvider instanceof PaymentProvider
+                ? $rawProvider->getId()
+                : $rawProvider,
+            'trx_id' => $screenshotData['trx_id'] ?? null,
+            'amount' => $screenshotData['amount'] ?? null,
+            'fee' => $screenshotData['fee'] ?? null,
+            'total_amount' => $screenshotData['total_amount'] ?? null,
+            'balance' => $screenshotData['balance'] ?? null,
+            'txn_type' => $screenshotData['txn_type'] ?? null,
+            'beneficiary_bank' => $screenshotData['beneficiary_bank'] ?? null,
+            'sender_account' => $screenshotData['sender_account'] ?? null,
+            'sender_number' => $screenshotData['sender_number'] ?? null,
+            'sender_name' => $screenshotData['sender_name'] ?? null,
+            'receiver_account' => $screenshotData['receiver_account'] ?? null,
+            'receiver_number' => $screenshotData['receiver_number'] ?? null,
+            'receiver_name' => $screenshotData['receiver_name'] ?? null,
+            'reference' => $screenshotData['reference'] ?? null,
+            'transaction_time' => $screenshotData['transaction_time'] ?? null,
+            'status_in_screenshot' => $screenshotData['status_in_screenshot'] ?? null,
+            'notes' => $screenshotData['notes'] ?? null,
         ];
-    }
 
-    public function accountMatches(string $account, string $message): bool
-    {
-        $cleanAccount = (string) preg_replace('/[^\d]/', '', $account);
-        if (strlen($cleanAccount) < 3) {
-            return false;
-        }
+        $invoiceDetails = [
+            'invoice_id' => $invoice->invoice_id,
+            'reference' => $invoice->reference,
+            'expected_amount' => (float) $invoice->amount,
+            'currency' => $invoice->currency ?? 'BDT',
+            'selected_provider' => $provider?->getId(),
+        ];
 
-        if (str_contains($message, $cleanAccount)) {
-            return true;
-        }
+        $screenshotJson = json_encode($sanitizedScreenshot, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        $candidatesJson = json_encode($candidates, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        $invoiceJson = json_encode($invoiceDetails, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 
-        $startDigits = substr($cleanAccount, 0, 3);
-        $endDigits = substr($cleanAccount, -3);
+        return <<<PROMPT
+You are an expert financial reconciliation auditor.
+Your job is to match a customer's payment proof (extracted screenshot data) against incoming unclaimed bank/MFS transactions received via SMS/API notifications.
 
-        return str_contains($message, $startDigits) && str_contains($message, $endDigits);
-    }
+=== EXPECTED INVOICE DETAILS ===
+{$invoiceJson}
 
-    public function resolveTransactionTime(\App\Models\Transaction $transaction): ?\Carbon\Carbon
-    {
-        if ($transaction->received_at) {
-            try {
-                return \Carbon\Carbon::parse($transaction->received_at);
-            } catch (\Throwable) {
-            }
-        }
+=== PAYMENT SCREENSHOT EXTRACTED DATA ===
+{$screenshotJson}
 
-        if ($transaction->trxid) {
-            try {
-                return \Carbon\Carbon::parse($transaction->trxid);
-            } catch (\Throwable) {
-            }
-        }
+=== CANDIDATE UNCLAIMED TRANSACTIONS ===
+{$candidatesJson}
 
-        return $transaction->created_at ? \Carbon\Carbon::parse($transaction->created_at) : null;
+=== MATCHING RULES ===
+1. Mandatory Amount Match: The candidate transaction's amount must match the transfer amount from the screenshot or the expected invoice amount (small variations <= 1.0 BDT due to rounding or fee inclusion are acceptable, but differing amounts must not match).
+2. Transaction ID / Reference Match: Check if the screenshot's trx_id or reference appears in the candidate's trxid field or inside the SMS message text.
+   - For bank transfers, the reference number on the customer receipt often matches the TrxID or appears in the bank SMS body.
+3. Account Number / Phone Matching: Compare sender and receiver accounts. In Bangladesh receipts and SMS, accounts are often partially masked (e.g. "1503XXXXXX001" vs "1503***001", or phone numbers like "01624093099"). Match non-masked prefix and suffix digits.
+4. Timestamp Match: Check that the transaction_time from the screenshot is temporally close to the candidate's received_at or created_at (typically within 30-60 minutes on the same day).
+5. Fraud & Suspicion Detection: If the receipt details appear forged, contradictory, or fail to correspond to genuine financial records, flag is_suspicious_or_edited as true.
+
+Identify the candidate transaction that has the HIGHEST confidence of matching this payment.
+If multiple candidates match, pick the one with the highest confidence score.
+If no candidate transaction matches the receipt, return matched_transaction_id as null and confidence_score as 0.0.
+
+Return a STRICT JSON object with these exact keys:
+- "matched_transaction_id": integer (the "id" of the best matching candidate transaction, or null if none match)
+- "confidence_score": float between 0.0 and 1.0 (e.g. 0.95 for strong match with exact TrxID and amount; 0.0 if no match)
+- "match_reason": string (a concise explanation of why this transaction matched or why no match was found)
+- "is_suspicious_or_edited": boolean (true if the receipt appears altered, fake, or fraudulent; false otherwise)
+PROMPT;
     }
 }

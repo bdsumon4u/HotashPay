@@ -219,6 +219,28 @@ it('verifies bKash to bank transfer screenshot detected as city_bank', function 
         'status' => 'approved',
     ]);
 
+    Http::fake([
+        'https://generativelanguage.googleapis.com/*' => Http::response([
+            'candidates' => [
+                [
+                    'content' => [
+                        'parts' => [
+                            [
+                                'text' => json_encode([
+                                    'matched_transaction_id' => $transaction->id,
+                                    'confidence_score' => 0.98,
+                                    'match_reason' => 'Exact match on TrxID DK4528OF9R and amount 7000 BDT',
+                                    'is_suspicious_or_edited' => false,
+                                ]),
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]),
+    ]);
+
+    /** @var \App\Services\GeminiVisionService&\Mockery\MockInterface $mockVision */
     $mockVision = Mockery::mock(\App\Services\GeminiVisionService::class)->makePartial();
     $mockVision->shouldReceive('analyzeScreenshot')
         ->once()
@@ -298,6 +320,7 @@ it('normalizes provider to city_bank when screenshot is bKash to City Bank trans
 
     $file = \Illuminate\Http\UploadedFile::fake()->image('city_receipt.jpg');
     $path = $file->store('test_screenshots', 'public');
+    assert(is_string($path));
 
     $result = $service->analyzeScreenshot($path);
 
@@ -368,14 +391,6 @@ it('dynamically resolves newly registered payment provider and aliases without m
     expect($prompt)->toContain('bank-brac')
         ->and($prompt)->toContain('BRAC Bank')
         ->and($prompt)->toContain('Reference Number');
-
-    // 3. Verify PaymentVerificationService dynamically resolves variants for candidate matching
-    $verificationService = app(\App\Services\PaymentVerificationService::class);
-    $variants = $verificationService->resolveProviderVariants('bank-brac');
-    expect($variants)->toContain('bank-brac')
-        ->and($variants)->toContain('BRAC Bank')
-        ->and($variants)->toContain('Astha')
-        ->and($variants)->toContain('আস্থা');
 });
 
 it('downscales and optimizes large receipt images before transmitting to gemini', function () {
@@ -391,6 +406,7 @@ it('downscales and optimizes large receipt images before transmitting to gemini'
     imagepng($img, null, 0);
     $largePng = ob_get_clean();
     imagedestroy($img);
+    assert(is_string($largePng));
 
     expect(strlen($largePng))->toBeGreaterThan(512 * 1024);
 
@@ -430,7 +446,9 @@ it('downscales and optimizes large receipt images before transmitting to gemini'
 
     expect($capturedPayload)->not->toBeNull();
     $inlineData = $capturedPayload['contents'][0]['parts'][1]['inline_data'];
+    assert(isset($inlineData['data']) && is_string($inlineData['data']));
     $transmittedBytes = base64_decode($inlineData['data']);
+    assert(is_string($transmittedBytes));
 
     // Optimized image should be JPEG and significantly smaller than the raw 2000x2000 PNG
     expect($inlineData['mime_type'])->toBe('image/jpeg')
@@ -493,6 +511,28 @@ it('preserves sms ground truth on transaction and does not overwrite with screen
         'status' => 'approved',
     ]);
 
+    Http::fake([
+        'https://generativelanguage.googleapis.com/*' => Http::response([
+            'candidates' => [
+                [
+                    'content' => [
+                        'parts' => [
+                            [
+                                'text' => json_encode([
+                                    'matched_transaction_id' => $transaction->id,
+                                    'confidence_score' => 0.98,
+                                    'match_reason' => 'Exact match on TrxID DK4528OF9R and amount 7000 BDT',
+                                    'is_suspicious_or_edited' => false,
+                                ]),
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]),
+    ]);
+
+    /** @var \App\Services\GeminiVisionService&\Mockery\MockInterface $mockVision */
     $mockVision = Mockery::mock(\App\Services\GeminiVisionService::class)->makePartial();
     $mockVision->shouldReceive('analyzeScreenshot')
         ->once()
@@ -567,19 +607,8 @@ it('releases job back to queue when candidate transaction is not yet received wi
         ],
     ]);
 
+    /** @var \App\Services\GeminiVisionService&\Mockery\MockInterface $mockVision */
     $mockVision = Mockery::mock(\App\Services\GeminiVisionService::class)->makePartial();
-    $mockVision->shouldReceive('analyzeScreenshot')
-        ->once()
-        ->andReturn([
-            'provider' => 'bank-city',
-            'trx_id' => 'DK4528OF9R',
-            'amount' => 5000.0,
-            'fee' => 0.0,
-            'total_amount' => 5000.0,
-            'status_in_screenshot' => 'successful',
-            'is_suspicious_or_edited' => false,
-            'confidence_score' => 0.95,
-        ]);
 
     $job = new \App\Jobs\VerifyPaymentJob(
         invoiceId: $invoice->id,
@@ -588,6 +617,7 @@ it('releases job back to queue when candidate transaction is not yet received wi
     );
 
     // Call job directly with empty candidate transactions in DB
+    assert($mockVision instanceof \App\Services\GeminiVisionService);
     $job->handle($mockVision, app(\App\Services\PaymentVerificationService::class));
 
     $invoice->refresh();
@@ -627,3 +657,429 @@ it('renders reference option on payment instructions', function (string $provide
     'bank-city',
     'bank-ebl',
 ]);
+
+it('matches transaction when received_at is older but created_at is within window', function () {
+    $invoice = Invoice::factory()->create([
+        'amount' => 600,
+        'status' => InvoiceStatus::PENDING,
+    ]);
+
+    $tx = Transaction::factory()->create([
+        'provider' => 'bkash-merchant',
+        'trxid' => 'DC46O25T7K',
+        'amount' => 600,
+        'invoice_id' => null,
+        'status' => 'approved',
+        'received_at' => now()->subMonths(5),
+        'created_at' => now()->subMinutes(5),
+    ]);
+
+    $verifier = app(\App\Services\PaymentVerificationService::class);
+    $matched = $verifier->findMatchingTransactionByTrxId($invoice, 'bkash-merchant', 'DC46O25T7K');
+
+    expect($matched)->not->toBeNull()
+        ->and($matched->id)->toBe($tx->id);
+});
+
+it('returns canonical driver key for provider', function () {
+    $manager = app(\App\Payment\PaymentManager::class);
+
+    expect($manager->getDriverKey('bkash-merchant'))->toBe('bkash-merchant')
+        ->and($manager->getDriverKey('bkash-personal'))->toBe('bkash-personal')
+        ->and($manager->getDriverKey('bank-city'))->toBe('bank-city')
+        ->and($manager->getDriverKey('bKash'))->toBe('bkash-personal');
+});
+
+it('allows retrying payment verification after failure', function () {
+    $invoice = Invoice::factory()->create([
+        'amount' => 600,
+        'status' => InvoiceStatus::PENDING,
+    ]);
+
+    $component = Livewire::test(MakePayment::class, ['invoice' => $invoice])
+        ->set('selectedProvider', 'bkash-merchant')
+        ->set('transactionId', 'WRONG_ID')
+        ->call('verifyTransaction');
+
+    expect($component->get('isVerifying'))->toBeFalse()
+        ->and($component->get('verificationFailed'))->toBeTrue();
+
+    $tx = Transaction::factory()->create([
+        'provider' => 'bkash-merchant',
+        'trxid' => 'CORRECT123',
+        'amount' => 600,
+        'invoice_id' => null,
+        'status' => 'approved',
+        'created_at' => now()->subMinutes(1),
+    ]);
+
+    $component->set('transactionId', 'CORRECT123')
+        ->call('verifyTransaction');
+
+    $tx->refresh();
+    $invoice->refresh();
+
+    expect($tx->invoice_id)->toBe($invoice->id)
+        ->and($invoice->status)->toBe(InvoiceStatus::PAID);
+});
+
+it('mounts with isVerifying as false even if previous verification was processing and supports cancelVerification', function () {
+    $invoice = Invoice::factory()->create([
+        'amount' => 600,
+        'status' => InvoiceStatus::PENDING,
+        'metadata' => [
+            'verification_status' => 'processing',
+            'verification_started_at' => now()->subMinutes(2)->toIso8601String(),
+        ],
+    ]);
+
+    $component = Livewire::test(MakePayment::class, ['invoice' => $invoice]);
+    expect($component->get('isVerifying'))->toBeFalse();
+
+    $component->set('isVerifying', true);
+    $component->call('cancelVerification');
+
+    expect($component->get('isVerifying'))->toBeFalse();
+    $invoice->refresh();
+    expect($invoice->metadata['verification_status'])->toBe('cancelled');
+});
+
+it('reconciles candidate transactions via gemini and returns the highest confidence match', function () {
+    $service = app(\App\Services\GeminiVisionService::class);
+
+    $invoice = Invoice::factory()->create([
+        'amount' => 1200,
+        'status' => InvoiceStatus::PENDING,
+    ]);
+
+    $tx1 = Transaction::factory()->create([
+        'provider' => 'bkash-personal',
+        'trxid' => 'TX111111',
+        'amount' => 1200,
+        'invoice_id' => null,
+    ]);
+
+    $tx2 = Transaction::factory()->create([
+        'provider' => 'bkash-personal',
+        'trxid' => 'TX222222',
+        'amount' => 1200,
+        'invoice_id' => null,
+    ]);
+
+    Http::fake([
+        'https://generativelanguage.googleapis.com/*' => Http::response([
+            'candidates' => [
+                [
+                    'content' => [
+                        'parts' => [
+                            [
+                                'text' => json_encode([
+                                    'matched_transaction_id' => $tx2->id,
+                                    'confidence_score' => 0.96,
+                                    'match_reason' => 'Exact match on TrxID TX222222 and amount 1200 BDT',
+                                    'is_suspicious_or_edited' => false,
+                                ]),
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]),
+    ]);
+
+    $screenshotData = [
+        'provider' => 'bkash-personal',
+        'trx_id' => 'TX222222',
+        'amount' => 1200.0,
+        'sender_account' => '01811223344',
+        'receiver_account' => '01624093099',
+    ];
+
+    $result = $service->reconcileCandidatesWithGemini(
+        screenshotData: $screenshotData,
+        candidateTransactions: [$tx1, $tx2],
+        invoice: $invoice,
+        provider: app(\App\Payment\PaymentManager::class)->findProvider('bkash-personal'),
+    );
+
+    expect($result['matched_transaction_id'])->toBe($tx2->id)
+        ->and($result['confidence_score'])->toBe(0.96)
+        ->and($result['is_suspicious_or_edited'])->toBeFalse()
+        ->and($result['match_reason'])->toContain('TX222222');
+});
+
+it('rejects match when gemini confidence score is below threshold', function () {
+    $service = app(\App\Services\GeminiVisionService::class);
+
+    $invoice = Invoice::factory()->create([
+        'amount' => 1200,
+        'status' => InvoiceStatus::PENDING,
+    ]);
+
+    $tx = Transaction::factory()->create([
+        'provider' => 'bkash-personal',
+        'trxid' => 'TX111111',
+        'amount' => 1200,
+        'invoice_id' => null,
+    ]);
+
+    Http::fake([
+        'https://generativelanguage.googleapis.com/*' => Http::response([
+            'candidates' => [
+                [
+                    'content' => [
+                        'parts' => [
+                            [
+                                'text' => json_encode([
+                                    'matched_transaction_id' => $tx->id,
+                                    'confidence_score' => 0.65, // Below default 0.85 threshold
+                                    'match_reason' => 'Low confidence match: amount matches but TrxID is missing',
+                                    'is_suspicious_or_edited' => false,
+                                ]),
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]),
+    ]);
+
+    $result = $service->reconcileCandidatesWithGemini(
+        screenshotData: ['amount' => 1200.0],
+        candidateTransactions: [$tx],
+        invoice: $invoice,
+    );
+
+    expect($result['matched_transaction_id'])->toBeNull()
+        ->and($result['confidence_score'])->toBe(0.65);
+});
+
+it('rejects hallucinated transaction id not present in candidate list', function () {
+    $service = app(\App\Services\GeminiVisionService::class);
+
+    $invoice = Invoice::factory()->create([
+        'amount' => 500,
+        'status' => InvoiceStatus::PENDING,
+    ]);
+
+    $tx = Transaction::factory()->create([
+        'provider' => 'nagad-personal',
+        'trxid' => 'NAGAD123',
+        'amount' => 500,
+        'invoice_id' => null,
+    ]);
+
+    Http::fake([
+        'https://generativelanguage.googleapis.com/*' => Http::response([
+            'candidates' => [
+                [
+                    'content' => [
+                        'parts' => [
+                            [
+                                'text' => json_encode([
+                                    'matched_transaction_id' => 999999, // Hallucinated ID
+                                    'confidence_score' => 0.99,
+                                    'match_reason' => 'Exact match on hallucinated ID',
+                                    'is_suspicious_or_edited' => false,
+                                ]),
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]),
+    ]);
+
+    $result = $service->reconcileCandidatesWithGemini(
+        screenshotData: ['amount' => 500.0],
+        candidateTransactions: [$tx],
+        invoice: $invoice,
+    );
+
+    expect($result['matched_transaction_id'])->toBeNull();
+});
+
+it('flags suspicious or edited receipt and does not match transaction', function () {
+    $service = app(\App\Services\GeminiVisionService::class);
+
+    $invoice = Invoice::factory()->create([
+        'amount' => 500,
+        'status' => InvoiceStatus::PENDING,
+    ]);
+
+    $tx = Transaction::factory()->create([
+        'provider' => 'nagad-personal',
+        'trxid' => 'NAGAD123',
+        'amount' => 500,
+        'invoice_id' => null,
+    ]);
+
+    Http::fake([
+        'https://generativelanguage.googleapis.com/*' => Http::response([
+            'candidates' => [
+                [
+                    'content' => [
+                        'parts' => [
+                            [
+                                'text' => json_encode([
+                                    'matched_transaction_id' => $tx->id,
+                                    'confidence_score' => 0.95,
+                                    'match_reason' => 'Amount matches, but fonts appear altered',
+                                    'is_suspicious_or_edited' => true,
+                                ]),
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]),
+    ]);
+
+    $result = $service->reconcileCandidatesWithGemini(
+        screenshotData: ['amount' => 500.0],
+        candidateTransactions: [$tx],
+        invoice: $invoice,
+    );
+
+    expect($result['matched_transaction_id'])->toBeNull()
+        ->and($result['is_suspicious_or_edited'])->toBeTrue();
+});
+
+it('avoids re-running gemini analysis when candidate transactions remain unchanged between retries', function () {
+    $invoice = Invoice::factory()->create([
+        'amount' => 500,
+        'status' => InvoiceStatus::PENDING,
+        'metadata' => [
+            'verification_status' => 'processing',
+            'verification_started_at' => now()->subMinutes(1)->toIso8601String(),
+            'verification_ai' => [
+                'provider' => 'nagad-personal',
+                'amount' => 500.0,
+                'trx_id' => 'UNKNOWN_TRX',
+                'is_suspicious_or_edited' => false,
+            ],
+            // Simulated: candidates [42] was already evaluated previously for this screenshot
+            'verification_cached_screenshot' => 'dummy/path.jpg',
+            'verification_last_candidates' => '42',
+        ],
+    ]);
+
+    Transaction::factory()->create([
+        'id' => 42,
+        'provider' => 'nagad-personal',
+        'trxid' => 'OTHER_TRX',
+        'amount' => 500,
+        'invoice_id' => null,
+    ]);
+
+    // Mock GeminiVisionService: analyzeScreenshot and matchScreenshot must NEVER be called!
+    /** @var \App\Services\GeminiVisionService&\Mockery\MockInterface $mockVision */
+    $mockVision = Mockery::mock(\App\Services\GeminiVisionService::class)->makePartial();
+    $mockVision->shouldNotReceive('analyzeScreenshot');
+    $mockVision->shouldNotReceive('matchScreenshotWithCandidateTransactions');
+    $mockVision->shouldNotReceive('reconcileCandidatesWithGemini');
+
+    $job = new \App\Jobs\VerifyPaymentJob(
+        invoiceId: $invoice->id,
+        provider: 'nagad-personal',
+        screenshotPath: 'dummy/path.jpg',
+    );
+
+    assert($mockVision instanceof \App\Services\GeminiVisionService);
+    $job->handle(
+        geminiVision: $mockVision,
+        verifier: app(\App\Services\PaymentVerificationService::class),
+        paymentManager: app(\App\Payment\PaymentManager::class),
+    );
+
+    // Job releases and does not fail; invoice remains pending
+    $invoice->refresh();
+    expect($invoice->status)->toBe(InvoiceStatus::PENDING)
+        ->and($invoice->metadata['verification_status'])->toBe('processing');
+});
+
+it('re-evaluates with gemini and ignores old cache when user retries with a new screenshot', function () {
+    $invoice = Invoice::factory()->create([
+        'amount' => 500,
+        'status' => InvoiceStatus::PENDING,
+        'metadata' => [
+            'verification_status' => 'processing',
+            'verification_started_at' => now()->toIso8601String(),
+            'verification_screenshot' => 'old_screenshot.jpg',
+            // Stale cache from the old wrong screenshot:
+            'verification_cached_screenshot' => 'old_screenshot.jpg',
+            'verification_ai' => [
+                'provider' => 'nagad-personal',
+                'amount' => 100.0,
+                'trx_id' => 'WRONG_OLD_TRX',
+                'is_suspicious_or_edited' => false,
+            ],
+            'verification_last_candidates' => '50',
+        ],
+    ]);
+
+    $transaction = Transaction::factory()->create([
+        'id' => 50,
+        'provider' => 'nagad-personal',
+        'trxid' => 'NEW_CORRECT_TRX',
+        'amount' => 500,
+        'invoice_id' => null,
+        'status' => 'approved',
+    ]);
+
+    Http::fake([
+        'https://generativelanguage.googleapis.com/*' => Http::response([
+            'candidates' => [
+                [
+                    'content' => [
+                        'parts' => [
+                            [
+                                'text' => json_encode([
+                                    'matched_transaction_id' => $transaction->id,
+                                    'confidence_score' => 0.98,
+                                    'match_reason' => 'Exact match for NEW_CORRECT_TRX',
+                                    'is_suspicious_or_edited' => false,
+                                ]),
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ]),
+    ]);
+
+    // Mock Vision: analyzeScreenshot MUST be called for the new screenshot path!
+    /** @var \App\Services\GeminiVisionService&\Mockery\MockInterface $mockVision */
+    $mockVision = Mockery::mock(\App\Services\GeminiVisionService::class)->makePartial();
+    $mockVision->shouldReceive('analyzeScreenshot')
+        ->once()
+        ->with('new_screenshot.jpg')
+        ->andReturn([
+            'provider' => 'nagad-personal',
+            'amount' => 500.0,
+            'trx_id' => 'NEW_CORRECT_TRX',
+            'is_suspicious_or_edited' => false,
+        ]);
+
+    $job = new \App\Jobs\VerifyPaymentJob(
+        invoiceId: $invoice->id,
+        provider: 'nagad-personal',
+        screenshotPath: 'new_screenshot.jpg',
+    );
+
+    assert($mockVision instanceof \App\Services\GeminiVisionService);
+    $job->handle(
+        geminiVision: $mockVision,
+        verifier: app(\App\Services\PaymentVerificationService::class),
+        paymentManager: app(\App\Payment\PaymentManager::class),
+    );
+
+    $invoice->refresh();
+    $transaction->refresh();
+
+    // Verify invoice is paid and the new transaction was claimed
+    expect($invoice->status)->toBe(InvoiceStatus::PAID)
+        ->and($transaction->invoice_id)->toBe($invoice->id)
+        ->and($invoice->metadata['verification_cached_screenshot'])->toBe('new_screenshot.jpg')
+        ->and($invoice->metadata['verification_ai']['trx_id'])->toBe('NEW_CORRECT_TRX');
+});

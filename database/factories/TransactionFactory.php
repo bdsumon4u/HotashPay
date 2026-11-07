@@ -18,9 +18,9 @@ class TransactionFactory extends Factory
     {
         return [
             'entry_type' => fake()->randomElement(['sms', 'manual']),
-            'sim' => fake()->randomElement(['bKash', 'Nagad', 'Rocket']),
+            'sim' => fake()->randomElement(['sim1', 'sim2']),
             'message' => fake()->sentence(),
-            'provider' => fake()->randomElement(['bKash', 'Nagad', 'Rocket']),
+            'provider' => fake()->randomElement(['bkash-merchant', 'bkash-personal', 'nagad-personal', 'bank-city', 'bank-ebl']),
             'amount' => fake()->randomFloat(2, 100, 10000),
             'mobile' => fake()->phoneNumber(),
             'trxid' => fake()->unique()->regexify('[A-Z0-9]{10}'),

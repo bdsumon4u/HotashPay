@@ -25,7 +25,8 @@ class SmsParser
 
         // If no provider regex matched, check if this is a financial transaction SMS from bank or MFS
         if (self::looksLikeTransactionSms($text)) {
-            $matches['provider'] = ! empty($providers) ? reset($providers)->getId() : $from;
+            $fallbackDriver = ! empty($providers) ? reset($providers) : (app(PaymentManager::class)->findProvider($from) ?? app(PaymentManager::class)->resolveProviderFromText(null, $from, $text));
+            $matches['provider'] = $fallbackDriver?->getId() ?? $from;
             $matches['amount'] = self::extractAmount($text);
             $matches['balance'] = self::extractBalance($text);
             $matches['trxid'] = self::extractTrxId($text);
@@ -50,9 +51,10 @@ class SmsParser
         }
 
         $trxId = $matches['trxid'] ?? self::extractTrxId($text);
+        $providerKey = app(PaymentManager::class)->getDriverKey($matches['provider'] ?? $from);
 
         return [
-            'provider' => $matches['provider'] ?? $from,
+            'provider' => $providerKey ?? $matches['provider'] ?? $from,
             'amount' => (string) str_replace(',', '', $matches['amount'] ?? '0'),
             'mobile' => $matches['mobile'] ?? $senderAccount ?? $receiverAccount ?? '--',
             'sender_account' => $senderAccount,
@@ -157,17 +159,37 @@ class SmsParser
     private static function parseDateTime(array $matches): ?string
     {
         try {
-            if (isset($matches['datetime'])) {
-                $dateString = str_replace('/', '-', $matches['datetime']);
+            if (isset($matches['datetime']) && is_string($matches['datetime'])) {
+                $dateString = (string) str_replace('/', '-', $matches['datetime']);
 
-                return Carbon::createFromFormat('d-m-Y H:i', $dateString)->toDateTimeString();
+                try {
+                    return Carbon::createFromFormat('d-m-Y H:i', $dateString)->toDateTimeString();
+                } catch (\Throwable) {
+                    return Carbon::parse($dateString)->toDateTimeString();
+                }
             }
 
-            if (isset($matches['date']) && isset($matches['time'])) {
-                $dateString = str_replace('/', '-', $matches['date']);
+            if (isset($matches['date'], $matches['time']) && is_string($matches['date']) && is_string($matches['time'])) {
+                $dateString = (string) str_replace('/', '-', $matches['date']);
                 $fullDateTime = "{$dateString} {$matches['time']}";
 
-                return Carbon::createFromFormat('d-m-Y H:i', $fullDateTime)->toDateTimeString();
+                try {
+                    return Carbon::createFromFormat('d-m-Y H:i', $fullDateTime)->toDateTimeString();
+                } catch (\Throwable) {
+                    return Carbon::parse($fullDateTime)->toDateTimeString();
+                }
+            }
+
+            if (isset($matches['date']) && is_string($matches['date'])) {
+                return Carbon::parse($matches['date'])->toDateTimeString();
+            }
+
+            if (isset($matches['trxid']) && is_string($matches['trxid'])) {
+                try {
+                    return Carbon::parse($matches['trxid'])->toDateTimeString();
+                } catch (\Throwable) {
+                    // Not a datetime string (expected for standard alpha-numeric transaction IDs)
+                }
             }
         } catch (Exception $e) {
             Log::warning('Failed to parse SMS datetime', ['matches' => $matches]);

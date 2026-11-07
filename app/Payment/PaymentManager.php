@@ -149,40 +149,17 @@ class PaymentManager extends Manager
     }
 
     /**
-     * Get all string variants and aliases for a provider (used for candidate DB transaction matching).
-     *
-     * @return array<string>
+     * Get the canonical payment driver key (stored in database transactions.provider).
      */
-    public function getProviderVariants(PaymentProvider|string|null $provider): array
+    public function getDriverKey(PaymentProvider|string|null $provider): ?string
     {
         if (! $provider) {
-            return [];
+            return null;
         }
 
         $resolved = $this->findProvider($provider);
-        $variants = [];
 
-        if (is_string($provider)) {
-            $variants[] = $provider;
-            $variants[] = strtolower($provider);
-            $variants[] = strtoupper($provider);
-        }
-
-        if ($resolved instanceof PaymentProvider) {
-            $variants[] = $resolved->getId();
-            $variants[] = strtolower($resolved->getId());
-            $variants[] = strtoupper($resolved->getId());
-            $variants[] = $resolved->getName();
-            $variants[] = strtolower($resolved->getName());
-
-            foreach ($resolved->getAliases() as $alias) {
-                $variants[] = $alias;
-                $variants[] = strtolower($alias);
-                $variants[] = strtoupper($alias);
-            }
-        }
-
-        return array_values(array_unique(array_filter($variants)));
+        return $resolved instanceof PaymentProvider ? $resolved->getId() : (string) $provider;
     }
 
     public function getDefaultDriver()

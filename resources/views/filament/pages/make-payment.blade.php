@@ -219,6 +219,7 @@
 
 <div class="w-full flex items-center justify-center p-3 sm:p-4"
     @if ($isVerifying) wire:poll.3s="checkVerificationStatus" @endif
+    @open-modal.window="activeModal = $event.detail"
     x-data="{
     currentView: @js($selectedProvider ? 'details' : 'methods'),
     activeTab: @js($selectedProvider ? (collect($gateways)->first(fn($m) => collect($m['drivers'])->pluck('folder')->contains($selectedProvider)) ? collect($gateways)->keys()->first(fn($k) => collect($gateways[$k]['drivers'] ?? [])->pluck('folder')->contains($selectedProvider)) : 'mobile') : 'mobile'),
@@ -334,7 +335,7 @@
 
             <!-- Center/Right: Action Buttons (Support, FAQ, Details) -->
             <div class="flex items-center gap-1 sm:gap-1.5">
-                <button type="button" @click="activeModal = 'support'"
+                <button type="button" @click.stop="activeModal = 'support'"
                     class="p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-xs transition flex items-center gap-1"
                     title="Customer Support">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -343,7 +344,7 @@
                     <span class="hidden sm:inline">Support</span>
                 </button>
 
-                <button type="button" @click="activeModal = 'faq'"
+                <button type="button" @click.stop="activeModal = 'faq'"
                     class="p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-xs transition flex items-center gap-1"
                     title="Frequently Asked Questions">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -352,7 +353,7 @@
                     <span class="hidden sm:inline">FAQ</span>
                 </button>
 
-                <button type="button" @click="activeModal = 'details'"
+                <button type="button" @click.stop="activeModal = 'details'"
                     class="p-1.5 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-xs transition flex items-center gap-1"
                     title="Invoice Details">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -500,7 +501,7 @@
 
                 <!-- Verification In-Progress Status Card -->
                 @if ($isVerifying)
-                    <div class="mb-3 p-3 rounded-xl bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700/60 text-xs">
+                    <div wire:key="verification-in-progress-card" class="mb-3 p-3 rounded-xl bg-emerald-50/90 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-700/60 text-xs">
                         <div class="flex items-start gap-2.5">
                             <div class="p-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/60 text-emerald-600 dark:text-emerald-300 shrink-0">
                                 <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -518,6 +519,13 @@
                                 <p class="text-emerald-800 dark:text-emerald-300 text-[11px] leading-relaxed">
                                     Our AI is reconciling your receipt against bank confirmation SMS. This usually takes 10–30 seconds.
                                 </p>
+                                <div class="pt-1 flex items-center justify-between">
+                                    <span class="text-[10px] text-emerald-700/80 dark:text-emerald-400">Waiting for confirmation SMS...</span>
+                                    <button type="button" wire:click="cancelVerification"
+                                        class="text-[11px] font-semibold text-rose-600 dark:text-rose-400 hover:underline cursor-pointer">
+                                        Cancel & Try Again
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -525,7 +533,7 @@
 
                 <!-- Verification Failed / Timeout Support Card -->
                 @if ($verificationFailed)
-                    <div class="mb-3 p-3 rounded-xl bg-rose-50/90 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 text-xs">
+                    <div wire:key="verification-failed-card" class="mb-3 p-3 rounded-xl bg-rose-50/90 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 text-xs">
                         <div class="flex items-start gap-2.5">
                             <div class="p-1.5 rounded-lg bg-rose-100 dark:bg-rose-900/60 text-rose-600 dark:text-rose-300 shrink-0">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -538,7 +546,9 @@
                                     {{ $verificationError ?? 'Could not verify payment within 10 minutes. If you completed the transfer, please contact our support team.' }}
                                 </p>
                                 <div class="pt-1 flex items-center gap-2">
-                                    <button type="button" @click="activeModal = 'support'"
+                                    <button type="button"
+                                        @click.stop="activeModal = 'support'"
+                                        onclick="event.stopPropagation(); window.dispatchEvent(new CustomEvent('open-modal', { detail: 'support' }))"
                                         class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-semibold text-[11px] shadow-sm transition flex items-center gap-1.5 cursor-pointer">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -676,7 +686,7 @@
                                         <p class="text-xs font-medium text-emerald-950 dark:text-emerald-200 truncate">
                                             {{ $screenshot->getClientOriginalName() }}
                                         </p>
-                                        <span class="text-[10px] text-emerald-700 dark:text-emerald-400 font-medium">Screenshot attached (Optional)</span>
+                                        <span class="text-[10px] text-emerald-700 dark:text-emerald-400 font-medium">Screenshot attached</span>
                                     </div>
                                 </div>
                                 <button type="button" wire:click="removeScreenshot"
@@ -782,11 +792,11 @@
                 <div class="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 space-y-2">
                     <div class="flex justify-between">
                         <span class="text-slate-500">Email:</span>
-                        <a href="mailto:support@hotashpay.test" class="font-semibold text-emerald-600 dark:text-emerald-400">support@hotashpay.test</a>
+                        <a href="mailto:support@hotash.tech" class="font-semibold text-emerald-600 dark:text-emerald-400">support@hotash.tech</a>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-slate-500">Helpline:</span>
-                        <span class="font-mono font-semibold text-slate-800 dark:text-slate-200">+880 1700-000000</span>
+                        <a href="tel:+8801761160380" class="font-mono font-semibold text-slate-800 dark:text-slate-200">+8801761160380</span>
                     </div>
                     <div class="flex justify-between">
                         <span class="text-slate-500">Hours:</span>

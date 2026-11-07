@@ -24,7 +24,7 @@ class BankEblDriver extends PaymentDriver
     public function getMessageFormats(): array
     {
         return [
-            '/AC\s+(?<receiver_account>\d+\*+\d+)\s+is credited with BDT\s+(?<amount>[\d,]+(?:\.\d{1,2})?)\s+as\s+.+?\s+on\s+(?<trxid>\d{2}-[A-Z]{3}-\d{2}\s+\d{2}:\d{2}:\d{2}\s+[AP]M)\s+Balance is BDT\s+(?<balance>[\d,]+(?:\.\d{1,2})?)\s+Thanks\.\s+EBL Helpline\s+\d+/i',
+            '/AC\s+(?<receiver_account>\d+\*+\d+)\s+is credited with (?:BDT|Tk\.?)\s*(?<amount>[\d,]+(?:\.\d{1,2})?)\s+as\s+.+?\s+on\s+(?<trxid>\d{2}-[A-Za-z]{3}-\d{2,4}\s+\d{2}:\d{2}:\d{2}\s+[AP]M)\s+Balance\s+is\s+(?:BDT|Tk\.?)\s*(?<balance>[\d,]+(?:\.\d{1,2})?)(?:\s+Thanks\.\s+EBL Helpline\s+\d+)?/i',
             '/AC\s+(?<receiver_account>\d+\*+\d+)\s+is credited with BDT\s+(?<amount>[\d,]+(?:\.\d{1,2})?)/i',
         ];
     }

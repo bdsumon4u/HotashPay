@@ -13,7 +13,7 @@ class NagadPersonalDriver extends PaymentDriver
 
     public function getAliases(): array
     {
-        return ['NAGAD', 'Nagad', 'nagad', 'নগদ', '01783110247', '01708403334'];
+        return ['NAGAD', 'Nagad', 'nagad', 'নগদ'];
     }
 
     public function getReceiptPromptNotes(): ?string
