@@ -1,6 +1,9 @@
 <?php
 
 use App\Models\Transaction;
+use App\Plugins\BankEbl\BankEblDriver;
+use App\Plugins\BankEbl\BankEblPlugin;
+use App\Plugins\PluginLoader;
 
 test('webhook processes sms notification with milliseconds timestamp from bkash', function () {
     $msTimestamp = 1772809460169; // milliseconds timestamp
@@ -78,4 +81,97 @@ test('webhook returns 422 when sms cannot be parsed', function () {
 
     $response->assertStatus(422);
     $response->assertJson(['status' => false, 'message' => 'Failed to parse SMS']);
+});
+
+test('bank ebl driver matches account transfer sms format', function () {
+    PluginLoader::register();
+
+    $driver = new BankEblDriver(new BankEblPlugin('bank-ebl'));
+    $text = 'AC 118***551 is credited with BDT 10000 as EBL Account Transfer on 05-MAR-26 02:40:16 PM Balance is BDT 26622 Thanks. EBL Helpline 16230';
+
+    $matches = [];
+    foreach ($driver->getMessageFormats() as $format) {
+        if (preg_match($format, $text, $matches)) {
+            break;
+        }
+    }
+
+    expect($matches)->not->toBeEmpty()
+        ->and($matches['amount'])->toBe('10000')
+        ->and($matches['balance'])->toBe('26622')
+        ->and($matches['trxid'])->toBe('05-MAR-26 02:40:16 PM');
+});
+
+test('bank ebl driver matches npsb fund transfer sms format', function () {
+    PluginLoader::register();
+
+    $driver = new BankEblDriver(new BankEblPlugin('bank-ebl'));
+    $text = 'AC 118***551 is credited with BDT 600 as NPSB FUND TRANSFER on 06-MAR-26 10:16:20 AM Balance is BDT 27222 Thanks. EBL Helpline 16230';
+
+    $matches = [];
+    foreach ($driver->getMessageFormats() as $format) {
+        if (preg_match($format, $text, $matches)) {
+            break;
+        }
+    }
+
+    expect($matches)->not->toBeEmpty()
+        ->and($matches['amount'])->toBe('600')
+        ->and($matches['balance'])->toBe('27222')
+        ->and($matches['trxid'])->toBe('06-MAR-26 10:16:20 AM');
+});
+
+test('sms parser extracts receiver and sender accounts from bank and mfs sms', function () {
+    // 1. EBL SMS
+    $eblText = 'AC 107***337 is credited with BDT 38100 as BEFTN on 05-NOV-26 06:04:00 PM Balance is BDT 50000 Thanks. EBL Helpline 16230';
+    $eblParsed = \App\Payment\SmsParser::parse('EBL', $eblText, now()->toDateTimeString());
+    expect($eblParsed)->not->toBeNull()
+        ->and($eblParsed['receiver_account'])->toBe('107***337')
+        ->and($eblParsed['amount'])->toBe('38100');
+
+    // 2. City Bank SMS
+    $cityText = 'A/C 1503***4001 is credited with BDT 25,400.00 on 05-NOV-26 04:23:00 PM Balance is BDT 100000';
+    $cityParsed = \App\Payment\SmsParser::parse('City Bank', $cityText, now()->toDateTimeString());
+    expect($cityParsed)->not->toBeNull()
+        ->and($cityParsed['receiver_account'])->toBe('1503***4001')
+        ->and($cityParsed['amount'])->toBe('25400.00');
+
+    // 3. BRAC Bank SMS
+    $bracText = 'Your BRAC Bank A/C#20539**0001 has been credited with Tk 7,320.83 on 05-Nov-2026';
+    $bracParsed = \App\Payment\SmsParser::parse('BRAC Bank', $bracText, now()->toDateTimeString());
+    expect($bracParsed)->not->toBeNull()
+        ->and($bracParsed['receiver_account'])->toBe('20539**0001')
+        ->and($bracParsed['amount'])->toBe('7320.83');
+
+    // 4. DBBL SMS
+    $dbblText = 'Dear Sir, your A/C ***2219 credited (Fund Transfer) by Tk. 6,500.00';
+    $dbblParsed = \App\Payment\SmsParser::parse('DBBL', $dbblText, now()->toDateTimeString());
+    expect($dbblParsed)->not->toBeNull()
+        ->and($dbblParsed['receiver_account'])->toBe('***2219')
+        ->and($dbblParsed['amount'])->toBe('6500.00');
+
+    // 5. bKash SMS
+    $bkashText = 'You have received payment Tk 600.00 from 01815252733. Fee Tk 0.00. Balance Tk 13990.10. TrxID DC61R98YS5 at 06/03/2026 21:04';
+    $bkashParsed = \App\Payment\SmsParser::parse('bKash', $bkashText, now()->toDateTimeString());
+    expect($bkashParsed)->not->toBeNull()
+        ->and($bkashParsed['sender_account'])->toBe('01815252733')
+        ->and($bkashParsed['trxid'])->toBe('DC61R98YS5');
+
+    // 6. EBL Real Sample
+    $eblSample = 'AC 118***551 is credited with BDT 40000 as NPSB FUND TRANSFER on 07-NOV-26 12:11:06 AM Balance is BDT 40226.66 Thanks. EBL Helpline 16230';
+    $eblSampleParsed = \App\Payment\SmsParser::parse('EBL', $eblSample, now()->toDateTimeString());
+    expect($eblSampleParsed)->not->toBeNull()
+        ->and($eblSampleParsed['provider'])->toBe('bank-ebl')
+        ->and($eblSampleParsed['receiver_account'])->toBe('118***551')
+        ->and($eblSampleParsed['amount'])->toBe('40000')
+        ->and($eblSampleParsed['balance'])->toBe('40226.66');
+
+    // 7. City Bank Real Sample
+    $citySample = "05-Nov-2026\nTk. 7,000 Deposit\nTk. 14,092 Balance\nA/C: 2304***1001";
+    $citySampleParsed = \App\Payment\SmsParser::parse('CITY BANK', $citySample, now()->toDateTimeString());
+    expect($citySampleParsed)->not->toBeNull()
+        ->and($citySampleParsed['provider'])->toBe('bank-city')
+        ->and($citySampleParsed['receiver_account'])->toBe('2304***1001')
+        ->and($citySampleParsed['amount'])->toBe('7000')
+        ->and($citySampleParsed['balance'])->toBe('14092');
 });

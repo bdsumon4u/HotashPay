@@ -21,38 +21,66 @@ class TransactionsTable
         return $table
             ->defaultSort('id', 'desc')
             ->columns([
-                TextColumn::make('entry_type')
-                    ->searchable(),
                 TextColumn::make('provider')
-                    ->searchable(),
-                TextColumn::make('amount')
-                    ->numeric()
+                    ->label('Provider')
+                    ->badge()
+                    ->color('info')
+                    ->formatStateUsing(fn ($state) => app(PaymentManager::class)->findProvider($state)?->getName() ?? ucfirst((string) $state))
+                    ->searchable()
                     ->sortable(),
-                TextColumn::make('mobile')
-                    ->searchable(),
                 TextColumn::make('trxid')
+                    ->label('TrxID / Ref')
+                    ->placeholder('—')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('amount')
+                    ->label('Amount')
+                    ->formatStateUsing(fn ($state) => 'BDT '.number_format((float) $state, 2))
+                    ->sortable(),
+                TextColumn::make('receiver_account')
+                    ->label('Receiver A/C')
+                    ->placeholder('—')
                     ->searchable(),
-                TextColumn::make('balance')
-                    ->numeric()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('sender_account')
+                    ->label('Sender A/C')
+                    ->placeholder('—')
+                    ->searchable(),
+                TextColumn::make('received_at')
+                    ->label('Tx Time')
+                    ->dateTime('d M Y h:i A')
+                    ->placeholder('—')
+                    ->sortable(),
+                TextColumn::make('message')
+                    ->label('SMS Content')
+                    ->limit(55)
+                    ->tooltip(fn ($record) => $record->message)
+                    ->searchable(),
                 TextColumn::make('status')
-                    ->searchable(),
+                    ->badge()
+                    ->color(fn ($state) => match ($state) {
+                        'approved' => 'success',
+                        default => 'warning',
+                    })
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('invoice.invoice_id')
                     ->label('Invoice')
                     ->searchable()
                     ->sortable()
                     ->url(fn ($record) => $record->invoice_id ? InvoiceResource::getUrl('view', ['record' => $record->invoice_id]) : null)
-                    ->openUrlInNewTab(),
-                TextColumn::make('received_at')
-                    ->dateTime()
+                    ->openUrlInNewTab()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('mobile')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('balance')
+                    ->formatStateUsing(fn ($state) => 'BDT '.number_format((float) $state, 2))
                     ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('entry_type')
+                    ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
